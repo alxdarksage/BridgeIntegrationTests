@@ -159,5 +159,10 @@ public class AppConfigTest {
         // Finally... we have one, it will be returned
         AppConfig config = userApi.getUsersAppConfig().execute().body();
         assertEquals(appConfig.getGuid(), config.getGuid());
+        
+        // Can access via the public API
+        user.signOut();
+        AppConfig publicConfig = userApi.getAppConfig(user.getStudyId()).execute().body();
+        assertEquals(config.getGuid(), publicConfig.getGuid());
     }
 }
