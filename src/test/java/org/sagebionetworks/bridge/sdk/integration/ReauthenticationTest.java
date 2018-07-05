@@ -105,6 +105,9 @@ public class ReauthenticationTest {
         SignIn request = new SignIn().study(user.getStudyId())
                 .email(user.getSession().getEmail()).reauthToken(reauthToken);
         
+        // reauthentication token is cached
+        Thread.sleep(15000);
+        
         AuthenticationApi authApi = user.getClient(AuthenticationApi.class);
         UserSessionInfo newSession = authApi.reauthenticate(request).execute().body();
         
@@ -159,7 +162,10 @@ public class ReauthenticationTest {
             participant.setLastName("Loo");
             
             userApi.updateUsersParticipantRecord(participant).execute().body();
-            
+
+            // reauthentication token is cached 
+            Thread.sleep(15000);
+
             // Cannot sign out, it destroys the token... but this will still reauth and rotate the token.
             
             SignIn signIn = new SignIn().study(testUser.getStudyId()).email(testUser.getEmail()).reauthToken(reauthToken);
