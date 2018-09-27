@@ -87,7 +87,7 @@ public class UserParticipantTest {
     }
 
     @Test
-    public void canAddButNotChangeExternalIdentifier() throws Exception {
+    public void canAddAndChangeExternalIdentifier() throws Exception {
         ForConsentedUsersApi usersApi = developer.getClient(ForConsentedUsersApi.class);
 
         StudyParticipant participant = usersApi.getUsersParticipantRecord().execute().body();
@@ -103,7 +103,7 @@ public class UserParticipantTest {
         usersApi.updateUsersParticipantRecord(participant).execute();
 
         participant = usersApi.getUsersParticipantRecord().execute().body();
-        assertEquals("ABC-123-XYZ", participant.getExternalId());
+        assertEquals("ThisWillNotWork", participant.getExternalId());
     }
     
     @Test

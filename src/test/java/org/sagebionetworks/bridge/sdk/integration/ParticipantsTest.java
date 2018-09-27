@@ -34,7 +34,6 @@ import org.sagebionetworks.bridge.rest.model.ConsentStatus;
 import org.sagebionetworks.bridge.rest.model.ForwardCursorScheduledActivityList;
 import org.sagebionetworks.bridge.rest.model.GuidVersionHolder;
 import org.sagebionetworks.bridge.rest.model.IdentifierHolder;
-import org.sagebionetworks.bridge.rest.model.IdentifierUpdate;
 import org.sagebionetworks.bridge.rest.model.Message;
 import org.sagebionetworks.bridge.rest.model.Phone;
 import org.sagebionetworks.bridge.rest.model.Role;
@@ -42,7 +41,6 @@ import org.sagebionetworks.bridge.rest.model.SchedulePlan;
 import org.sagebionetworks.bridge.rest.model.ScheduledActivity;
 import org.sagebionetworks.bridge.rest.model.ScheduledActivityList;
 import org.sagebionetworks.bridge.rest.model.SharingScope;
-import org.sagebionetworks.bridge.rest.model.SignIn;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.SimpleScheduleStrategy;
 import org.sagebionetworks.bridge.rest.model.Study;
@@ -68,6 +66,8 @@ import java.util.Map;
 import java.util.stream.Collectors;
 
 public class ParticipantsTest {
+    private static final Phone OTHER_PHONE = new Phone().number("+12065881469").regionCode("US");
+    
     private TestUser admin;
     private TestUser researcher;
     private TestUser phoneUser;
@@ -319,10 +319,12 @@ public class ParticipantsTest {
             List<String> newLanguages = Lists.newArrayList("de","sw");
             List<String> newDataGroups = Lists.newArrayList("group1");
             
+            String newEmail = IntegTestUtils.makeEmail(ParticipantsTest.class);
+            
             StudyParticipant newParticipant = new StudyParticipant();
             newParticipant.setFirstName("FirstName2");
             newParticipant.setLastName("LastName2");
-            newParticipant.setEmail(email);
+            newParticipant.setEmail(newEmail);
             newParticipant.setExternalId("externalID2");
             newParticipant.setSharingScope(SharingScope.NO_SHARING);
             newParticipant.setNotifyByEmail(null);
@@ -333,8 +335,7 @@ public class ParticipantsTest {
             // This should not work.
             newParticipant.setEmailVerified(Boolean.TRUE);
             newParticipant.setPhoneVerified(Boolean.TRUE);
-            Phone newPhone = new Phone().number("4152588569").regionCode("CA");
-            newParticipant.setPhone(newPhone);
+            newParticipant.setPhone(OTHER_PHONE);
             
             participantsApi.updateParticipant(id, newParticipant).execute();
             
@@ -345,14 +346,13 @@ public class ParticipantsTest {
             retrieved = participantsApi.getParticipantById(id, true).execute().body();
             assertEquals("FirstName2", retrieved.getFirstName());
             assertEquals("LastName2", retrieved.getLastName());
-            assertEquals(email, retrieved.getEmail()); // This cannot be updated
+            assertEquals(newEmail, retrieved.getEmail());
             retrievedPhone = retrieved.getPhone();
-            assertEquals(IntegTestUtils.PHONE.getNumber(), retrievedPhone.getNumber()); // This cannot be updated
+            assertEquals("(206) 588-1469", retrievedPhone.getNationalFormat());
             assertEquals("US", retrievedPhone.getRegionCode());
-            assertEquals("(971) 248-6796", retrievedPhone.getNationalFormat());
             assertFalse(retrieved.isEmailVerified());
             assertFalse(retrieved.isPhoneVerified());
-            assertEquals("externalID", retrieved.getExternalId()); // This cannot be updated
+            assertEquals("externalID2", retrieved.getExternalId());
             assertEquals(SharingScope.NO_SHARING, retrieved.getSharingScope());
             // BRIDGE-1604: should still be true, even though it was not sent to the server. Through participants API 
             assertTrue(retrieved.isNotifyByEmail());
@@ -633,26 +633,34 @@ public class ParticipantsTest {
     public void addEmailToPhoneUser() throws Exception {
         SignUp signUp = new SignUp().phone(IntegTestUtils.PHONE).password("P@ssword`1").study(IntegTestUtils.STUDY_ID);
         phoneUser = TestUserHelper.createAndSignInUser(ParticipantsTest.class, true, signUp);
-        
-        SignIn signIn = new SignIn().phone(signUp.getPhone()).password(signUp.getPassword()).study(IntegTestUtils.STUDY_ID);
 
         String email = IntegTestUtils.makeEmail(ParticipantsTest.class);
-        IdentifierUpdate identifierUpdate = new IdentifierUpdate().signIn(signIn).emailUpdate(email);
         
-        ForConsentedUsersApi usersApi = phoneUser.getClient(ForConsentedUsersApi.class);
-        UserSessionInfo info = usersApi.updateUsersIdentifiers(identifierUpdate).execute().body();
+        ForConsentedUsersApi userApi = phoneUser.getClient(ForConsentedUsersApi.class);
+        StudyParticipant participant = userApi.getUsersParticipantRecord().execute().body();
+        participant.setEmail(email);
+        
+        UserSessionInfo info = userApi.updateUsersParticipantRecord(participant).execute().body();
+        
         assertEquals(email, info.getEmail());
+        assertFalse(info.isEmailVerified());
         
         ParticipantsApi participantsApi = researcher.getClient(ParticipantsApi.class);
         StudyParticipant retrieved = participantsApi.getParticipantById(phoneUser.getSession().getId(), true).execute().body();
         assertEquals(email, retrieved.getEmail());
         
-        // But if you do it again, it should not work
+        // And you can replace it...
         String newEmail = IntegTestUtils.makeEmail(ParticipantsTest.class);
-        identifierUpdate = new IdentifierUpdate().signIn(signIn).emailUpdate(newEmail);
         
-        info = usersApi.updateUsersIdentifiers(identifierUpdate).execute().body();
-        assertEquals(email, info.getEmail()); // unchanged
+        participant.setEmail(newEmail);
+        info = userApi.updateUsersParticipantRecord(participant).execute().body();
+        
+        assertEquals(newEmail, info.getEmail());
+        assertFalse(info.isEmailVerified());
+        
+        StudyParticipant participant2 = researcher.getClient(ParticipantsApi.class)
+                .getParticipantById(phoneUser.getUserId(), false).execute().body();
+        assertEquals(newEmail, participant2.getEmail());
     }
 
     @Test
@@ -661,24 +669,27 @@ public class ParticipantsTest {
         SignUp signUp = new SignUp().email(email).password("P@ssword`1").study(IntegTestUtils.STUDY_ID);
         emailUser = TestUserHelper.createAndSignInUser(ParticipantsTest.class, true, signUp);
         
-        SignIn signIn = new SignIn().email(signUp.getEmail()).password(signUp.getPassword()).study(IntegTestUtils.STUDY_ID);
+        ForConsentedUsersApi userApi = emailUser.getClient(ForConsentedUsersApi.class);
+        StudyParticipant participant = userApi.getUsersParticipantRecord().execute().body();
 
-        IdentifierUpdate identifierUpdate = new IdentifierUpdate().signIn(signIn).phoneUpdate(IntegTestUtils.PHONE);
+        participant.setPhone(IntegTestUtils.PHONE);
         
-        ForConsentedUsersApi usersApi = emailUser.getClient(ForConsentedUsersApi.class);
-        UserSessionInfo info = usersApi.updateUsersIdentifiers(identifierUpdate).execute().body();
+        UserSessionInfo info = userApi.updateUsersParticipantRecord(participant).execute().body();
+        
         assertEquals(IntegTestUtils.PHONE.getNumber(), info.getPhone().getNumber());
+        assertFalse(info.isPhoneVerified());
         
-        ParticipantsApi participantsApi = researcher.getClient(ParticipantsApi.class);
-        StudyParticipant retrieved = participantsApi.getParticipantById(emailUser.getSession().getId(), true).execute().body();
-        assertEquals(IntegTestUtils.PHONE.getNumber(), retrieved.getPhone().getNumber());
+        // And you can replace it...
         
-        // But if you do it again, it should not work
-        Phone otherPhone = new Phone().number("4082588569").regionCode("US");
-        identifierUpdate = new IdentifierUpdate().signIn(signIn).phoneUpdate(otherPhone);
+        participant.setPhone(OTHER_PHONE);
+        info = userApi.updateUsersParticipantRecord(participant).execute().body();
         
-        info = usersApi.updateUsersIdentifiers(identifierUpdate).execute().body();
-        assertEquals(IntegTestUtils.PHONE.getNumber(), info.getPhone().getNumber()); // unchanged
+        assertEquals(OTHER_PHONE.getNumber(), info.getPhone().getNumber());
+        assertFalse(info.isPhoneVerified());
+        
+        StudyParticipant participant2 = researcher.getClient(ParticipantsApi.class)
+                .getParticipantById(emailUser.getUserId(), false).execute().body();
+        assertEquals(OTHER_PHONE.getNumber(), participant2.getPhone().getNumber());
     }
     
     private static List<ScheduledActivity> findActivitiesByLabel(List<ScheduledActivity> scheduledActivityList,

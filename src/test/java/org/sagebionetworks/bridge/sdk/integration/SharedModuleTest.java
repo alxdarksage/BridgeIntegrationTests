@@ -81,6 +81,7 @@ public class SharedModuleTest {
 
         if (localSchema != null) {
             try {
+                adminApi.adminChangeStudy(new SignIn().study(IntegTestUtils.STUDY_ID)).execute();
                 adminApi.deleteAllRevisionsOfUploadSchema(localSchema.getSchemaId(), true)
                         .execute();
             } catch (BridgeSDKException ex) {
@@ -93,10 +94,11 @@ public class SharedModuleTest {
             try {
                 adminApi.adminChangeStudy(new SignIn().study(studyIdShared)).execute();
                 adminApi.deleteAllRevisionsOfUploadSchema(sharedSchema.getSchemaId(), true).execute();
-                adminApi.adminChangeStudy(new SignIn().study(IntegTestUtils.STUDY_ID)).execute();
             } catch (BridgeSDKException ex) {
                 LOG.error("Error deleting schema " + sharedSchema.getSchemaId() + " in study " +
                         sharedDeveloper.getStudyId() + ": "  + ex.getMessage(), ex);
+            } finally {
+                adminApi.adminChangeStudy(new SignIn().study(IntegTestUtils.STUDY_ID)).execute();
             }
         }
 
