@@ -209,7 +209,6 @@ public class UploadTest {
     }
 
     @Test
-    @Ignore
     public void genericSurvey() throws Exception {
         testSurvey("generic-survey-encrypted");
     }
@@ -248,13 +247,11 @@ public class UploadTest {
     }
 
     @Test
-    @Ignore
     public void legacyNonSurvey() throws Exception {
         testNonSurvey("legacy-non-survey-encrypted");
     }
 
     @Test
-    @Ignore
     public void genericNonSurvey() throws Exception {
         testNonSurvey("generic-non-survey-encrypted");
     }
@@ -274,7 +271,6 @@ public class UploadTest {
     }
 
     @Test
-    @Ignore
     public void schemaless() throws Exception {
         // Just test that the record was successfully submitted, has no schema, and has raw data.
         HealthDataRecord record = testUpload("schemaless-encrypted");
@@ -328,7 +324,6 @@ public class UploadTest {
     }
 
     @Test
-    @Ignore
     public void miscTests() throws Exception {
         // This test tests synchronous mode, redrive, and get upload by upload ID / record ID APIs. They're all lumped
         // into a single method to avoid having to set up an upload multiple times.
