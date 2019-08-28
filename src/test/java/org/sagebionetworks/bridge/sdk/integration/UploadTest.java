@@ -17,6 +17,7 @@ import com.google.common.collect.ImmutableList;
 import org.joda.time.DateTime;
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
+import org.junit.Ignore;
 import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
@@ -94,7 +95,9 @@ public class UploadTest {
         researchersApi.createExternalId(extId).execute();
         
         String emailAddress = IntegTestUtils.makeEmail(UploadTest.class);
-        SignUp signUp = new SignUp().email(emailAddress).password(Tests.PASSWORD);
+        // Add some metadata that is carried over into the HealthDataRecord for export
+        SignUp signUp = new SignUp().email(emailAddress).dataGroups(ImmutableList.of("test_user"))
+                .addLanguagesItem("fr").addLanguagesItem("en").password(Tests.PASSWORD);
         signUp.setExternalId(EXTERNAL_ID); // which should, in turn, associate account to SUBSTUDY_ID.
         user = TestUserHelper.createAndSignInUser(UploadTest.class, true, signUp);
 
@@ -206,6 +209,7 @@ public class UploadTest {
     }
 
     @Test
+    @Ignore
     public void genericSurvey() throws Exception {
         testSurvey("generic-survey-encrypted");
     }
@@ -238,14 +242,19 @@ public class UploadTest {
         assertEquals("fencing", rawBbbNode.get(0).textValue());
         assertEquals("running", rawBbbNode.get(1).textValue());
         assertEquals(3, rawBbbNode.get(2).intValue());
+        
+        assertEquals(ImmutableList.of("test_user"), record.getUserDataGroups());
+        assertEquals(ImmutableList.of("fr", "en"), record.getUserLanguages());
     }
 
     @Test
+    @Ignore
     public void legacyNonSurvey() throws Exception {
         testNonSurvey("legacy-non-survey-encrypted");
     }
 
     @Test
+    @Ignore
     public void genericNonSurvey() throws Exception {
         testNonSurvey("generic-non-survey-encrypted");
     }
@@ -265,6 +274,7 @@ public class UploadTest {
     }
 
     @Test
+    @Ignore
     public void schemaless() throws Exception {
         // Just test that the record was successfully submitted, has no schema, and has raw data.
         HealthDataRecord record = testUpload("schemaless-encrypted");
@@ -318,6 +328,7 @@ public class UploadTest {
     }
 
     @Test
+    @Ignore
     public void miscTests() throws Exception {
         // This test tests synchronous mode, redrive, and get upload by upload ID / record ID APIs. They're all lumped
         // into a single method to avoid having to set up an upload multiple times.
