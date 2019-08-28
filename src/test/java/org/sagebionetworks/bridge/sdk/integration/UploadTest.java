@@ -97,7 +97,7 @@ public class UploadTest {
         String emailAddress = IntegTestUtils.makeEmail(UploadTest.class);
         // Add some metadata that is carried over into the HealthDataRecord for export
         SignUp signUp = new SignUp().email(emailAddress).dataGroups(ImmutableList.of("test_user"))
-                .addLanguagesItem("fr").addLanguagesItem("en").password(Tests.PASSWORD);
+                .languages(ImmutableList.of("fr", "en")).password(Tests.PASSWORD);
         signUp.setExternalId(EXTERNAL_ID); // which should, in turn, associate account to SUBSTUDY_ID.
         user = TestUserHelper.createAndSignInUser(UploadTest.class, true, signUp);
 
