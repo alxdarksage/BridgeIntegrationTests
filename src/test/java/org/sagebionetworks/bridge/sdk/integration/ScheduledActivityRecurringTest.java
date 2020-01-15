@@ -133,6 +133,7 @@ public class ScheduledActivityRecurringTest {
         String ytz1 = now.withZone(YTZ).toLocalDate().toString()+Y_TIME_OF_DAY;
         String ytz2 = now.withZone(YTZ).plusDays(1).toLocalDate().toString()+Y_TIME_OF_DAY;
         String ytz3 = now.withZone(YTZ).plusDays(2).toLocalDate().toString()+Y_TIME_OF_DAY;
+        String ytz4 = now.withZone(YTZ).plusDays(3).toLocalDate().toString()+Y_TIME_OF_DAY;
         
         // Get three tasks in the Gilbert Island for today and next 2 days
         ScheduledActivityList activities = filterList(
@@ -148,10 +149,11 @@ public class ScheduledActivityRecurringTest {
         activities = filterList(usersApi.getScheduledActivities("-12:00", 2, null).execute().body(),
                 schedulePlan.getGuid());
         
-        assertEquals(3, activities.getItems().size());
+        assertEquals(4, activities.getItems().size());
         assertEquals(ytz1, activities.getItems().get(0).getScheduledOn().toString());
         assertEquals(ytz2, activities.getItems().get(1).getScheduledOn().toString());
         assertEquals(ytz3, activities.getItems().get(2).getScheduledOn().toString());
+        assertEquals(ytz4, activities.getItems().get(3).getScheduledOn().toString());
         
         // Return to +12:00 land and ask for activites for three days, but one day in the future
         ScheduledActivityListV4 activitiesV4 = filterList(usersApi
