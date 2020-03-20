@@ -325,8 +325,8 @@ public class AssessmentTest {
         ForSuperadminsApi superAdminApi = admin.getClient(ForSuperadminsApi.class);
         SharedAssessmentsApi adminSharedApi = admin.getClient(SharedAssessmentsApi.class);
 
-        // Import a shared assessment back into the study
-        Assessment newAssessment = sharedApi.importSharedAssessment(shared.getGuid(), SUBSTUDY_ID_1).execute().body();        
+        // Import a shared assessment back into the study. Don't include an owner ID and it should default
+        Assessment newAssessment = sharedApi.importSharedAssessment(shared.getGuid(), null).execute().body();        
         assertEquals(shared.getGuid(), newAssessment.getOriginGuid());
         assertEquals(SUBSTUDY_ID_1, newAssessment.getOwnerId());
         assertNotEquals(shared.getGuid(), newAssessment.getGuid());
