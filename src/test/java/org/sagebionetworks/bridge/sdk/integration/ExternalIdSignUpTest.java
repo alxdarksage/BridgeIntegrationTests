@@ -13,9 +13,10 @@ import org.sagebionetworks.bridge.rest.api.AuthenticationApi;
 import org.sagebionetworks.bridge.rest.api.ExternalIdentifiersApi;
 import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
 import org.sagebionetworks.bridge.rest.api.ForResearchersApi;
+import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.exceptions.ConsentRequiredException;
 import org.sagebionetworks.bridge.rest.model.AccountStatus;
-import org.sagebionetworks.bridge.rest.model.ExternalIdentifier;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.ExternalIdentifierList;
 import org.sagebionetworks.bridge.rest.model.GeneratedPassword;
 import org.sagebionetworks.bridge.rest.model.Role;
@@ -63,13 +64,14 @@ public class ExternalIdSignUpTest {
         String userId2 = null;
         String userId3 = null;
         try {
-            devIdsClient.createExternalId(new ExternalIdentifier().studyId(STUDY_ID_1).identifier(externalId1)).execute();
-            devIdsClient.createExternalId(new ExternalIdentifier().studyId(STUDY_ID_1).identifier(externalId2)).execute();
-            devIdsClient.createExternalId(new ExternalIdentifier().studyId(STUDY_ID_1).identifier(externalId3)).execute();
             
-            SignUp signUp = new SignUp().appId(TEST_APP_ID).password(Tests.PASSWORD);
-            signUp.externalId(externalId1);
-            authClient.signUp(signUp).execute();
+            SignUp signUp = new SignUp();
+            Enrollment en1 = new Enrollment().studyId(STUDY_ID_1).externalId(externalId1);
+            signUp.setEnrollment(en1);
+            
+            // You can't enroll yourself in a study without signing a consent...we need
+            // a researcher to enroll you.
+            devResearcher.getClient(ParticipantsApi.class).createParticipant(signUp).execute();
             
             ExternalIdentifierList list = devIdsClient.getExternalIds(null, 5, externalId1, null).execute().body();
             assertEquals(1, list.getItems().size());
@@ -113,9 +115,10 @@ public class ExternalIdSignUpTest {
             // Third case: create an account with an externalId, then generate the password, and the 
             // account should now be usable (enabled)
             signUp = new SignUp();
-            signUp.externalId(externalId3);
+            Enrollment en3 = new Enrollment().studyId(STUDY_ID_1).externalId(externalId3);
+            signUp.enrollment(en3);
             signUp.appId(TEST_APP_ID);
-            authClient.signUp(signUp).execute();
+            devResearcher.getClient(ParticipantsApi.class).createParticipant(signUp).execute();
             
             GeneratedPassword generatedPassword3 = researchersClient.generatePassword(
                     externalId3, false).execute().body();
@@ -138,9 +141,6 @@ public class ExternalIdSignUpTest {
             if (userId3 != null) {
                 adminClient.deleteUser(userId3).execute();
             }
-            adminClient.deleteExternalId(externalId1).execute();
-            adminClient.deleteExternalId(externalId2).execute();
-            adminClient.deleteExternalId(externalId3).execute();
         }
     }
 }

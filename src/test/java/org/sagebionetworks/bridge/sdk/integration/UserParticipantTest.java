@@ -18,7 +18,7 @@ import org.junit.experimental.categories.Category;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.exceptions.ConstraintViolationException;
-import org.sagebionetworks.bridge.rest.model.ExternalIdentifier;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.Role;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
@@ -92,32 +92,35 @@ public class UserParticipantTest {
     }
 
     @Test
-    public void canAddButNotChangeExternalIdentifier() throws Exception {
-        ExternalIdentifier externalId1 = Tests.createExternalId(UserParticipantTest.class, developer, STUDY_ID_1);
-        ExternalIdentifier externalId2 = Tests.createExternalId(UserParticipantTest.class, developer, STUDY_ID_1);
+    public void canAddButNotChangeEnrollment() throws Exception {
+        String externalId1 = Tests.randomIdentifier(UserParticipantTest.class);
+        String externalId2 = Tests.randomIdentifier(UserParticipantTest.class);
         
         TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, false);
         try {
             ForConsentedUsersApi usersApi = user.getClient(ForConsentedUsersApi.class);
             StudyParticipant participant = usersApi.getUsersParticipantRecord(false).execute().body();
-            participant.setExternalId(externalId1.getIdentifier());
+            
+            Enrollment en1 = new Enrollment().studyId(STUDY_ID_1).externalId(externalId1);
+            participant.enrollment(en1);
 
             UserSessionInfo session = usersApi.updateUsersParticipantRecord(participant).execute().body();
-            assertEquals(externalId1.getIdentifier(), session.getExternalIds().get(STUDY_ID_1));
+            assertEquals(externalId1, session.getExternalIds().get(STUDY_ID_1));
+            assertTrue(session.getStudyIds().contains(STUDY_ID_1));
 
             participant = usersApi.getUsersParticipantRecord(false).execute().body();
             assertEquals(user.getEmail(), participant.getEmail());
-            assertTrue(participant.getExternalIds().values().contains(externalId1.getIdentifier()));
+            assertEquals(externalId1, participant.getExternalIds().get(STUDY_ID_1));
+            assertTrue(participant.getStudyIds().contains(STUDY_ID_1));
             
             try {
-                participant.setExternalId(externalId2.getIdentifier());
+                Enrollment en2 = new Enrollment().studyId(STUDY_ID_1).externalId(externalId2);
+                participant.enrollment(en2);
                 usersApi.updateUsersParticipantRecord(participant).execute();
                 fail("Exception should have been thrown");
             } catch(ConstraintViolationException e) {
             }
         } finally {
-            Tests.deleteExternalId(externalId1);
-            Tests.deleteExternalId(externalId2);
             user.signOutAndDeleteUser();
         }
     }

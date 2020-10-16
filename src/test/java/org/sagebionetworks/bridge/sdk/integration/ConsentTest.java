@@ -34,6 +34,7 @@ import org.sagebionetworks.bridge.rest.api.ForResearchersApi;
 import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
 import org.sagebionetworks.bridge.rest.api.InternalApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
+import org.sagebionetworks.bridge.rest.api.StudiesApi;
 import org.sagebionetworks.bridge.rest.api.SubpopulationsApi;
 import org.sagebionetworks.bridge.rest.exceptions.ConsentRequiredException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityAlreadyExistsException;
@@ -42,6 +43,7 @@ import org.sagebionetworks.bridge.rest.exceptions.InvalidEntityException;
 import org.sagebionetworks.bridge.rest.model.App;
 import org.sagebionetworks.bridge.rest.model.ConsentSignature;
 import org.sagebionetworks.bridge.rest.model.ConsentStatus;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.GuidVersionHolder;
 import org.sagebionetworks.bridge.rest.model.HealthDataRecord;
 import org.sagebionetworks.bridge.rest.model.Message;
@@ -492,8 +494,15 @@ public class ConsentTest {
 
     @Test
     public void canWithdrawParticipantFromApp() throws Exception {
-        TestUser testUser = TestUserHelper.createAndSignInUser(ConsentTest.class, true);
+        String externalId = IntegTestUtils.makeEmail(ConsentTest.class);
+        TestUser testUser = TestUserHelper.createAndSignInUser(ConsentTest.class, false);
         String userId = testUser.getSession().getId();
+        
+        Enrollment enrollment = new Enrollment();
+        enrollment.setExternalId(externalId);
+        enrollment.setUserId(userId);
+        adminUser.getClient(StudiesApi.class).enrollParticipant(STUDY_ID_1, enrollment).execute();
+        
         try {
             ParticipantsApi participantsApi = researchUser.getClient(ParticipantsApi.class);
 
@@ -509,7 +518,9 @@ public class ConsentTest {
             assertFalse(theUser.isEmailVerified());
             assertNull(theUser.getPhone());
             assertFalse(theUser.isPhoneVerified());
-            assertNull(theUser.getExternalId());
+            // consenting puts you in study 1, so this should no longer be set.
+            assertNull(theUser.getExternalIds().get(STUDY_ID_1));
+            assertTrue(theUser.getStudyIds().isEmpty());
             for (List<UserConsentHistory> histories : theUser.getConsentHistories().values()) {
                 for (UserConsentHistory oneHistory : histories) {
                     assertNotNull(oneHistory.getWithdrewOn());

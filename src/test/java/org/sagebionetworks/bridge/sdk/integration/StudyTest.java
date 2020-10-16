@@ -27,19 +27,18 @@ import org.sagebionetworks.bridge.rest.api.StudiesApi;
 import org.sagebionetworks.bridge.rest.exceptions.BadRequestException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.exceptions.InvalidEntityException;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.IdentifierHolder;
 import org.sagebionetworks.bridge.rest.model.OrganizationList;
 import org.sagebionetworks.bridge.rest.model.Role;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyList;
-import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
 
-import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
 
 public class StudyTest {
@@ -164,12 +163,11 @@ public class StudyTest {
         userIdsToDelete.add(researcherUser.getUserId());
         
         ParticipantsApi participantApi = researcherUser.getClient(ParticipantsApi.class);
-        StudyParticipant researcher = participantApi.getParticipantById(researcherUser.getUserId(), false).execute().body();
         
         // Cannot associate this user to a non-existent sub-study
         try {
-            researcher.setStudyIds(ImmutableList.of(id1, "bad-id"));
-            participantApi.updateParticipant(researcherUser.getUserId(), researcher).execute().body();
+            Enrollment en = new Enrollment().studyId("bad-id");
+            researcherUser.getClient(StudiesApi.class).enrollParticipant("bad-id", en).execute();
             fail("Should have thrown exception");
         } catch(InvalidEntityException e) {
             assertEquals("studyIds[bad-id] is not a study", e.getErrors().get("studyIds[bad-id]").get(0));
@@ -180,7 +178,9 @@ public class StudyTest {
         
         // Cannot sign this user up because the studies include one the researcher does not possess.
         try {
-            signUp2.studyIds(ImmutableList.of(id1, id2));
+            Enrollment en2 = new Enrollment().studyId(id2);
+            researcherUser.getClient(StudiesApi.class).enrollParticipant(id2, en2).execute();
+            
             participantApi.createParticipant(signUp2).execute().body();
             fail("Should have thrown exception");
         } catch(BadRequestException e) {
@@ -188,7 +188,7 @@ public class StudyTest {
         }
         
         // User can be created if it has at least one study from the researcher creating it
-        signUp2.studyIds(ImmutableList.of(id1));
+        signUp2.enrollment(new Enrollment().studyId(id1));
         IdentifierHolder keys = participantApi.createParticipant(signUp2).execute().body();
         userIdsToDelete.add(keys.getIdentifier());
     }
