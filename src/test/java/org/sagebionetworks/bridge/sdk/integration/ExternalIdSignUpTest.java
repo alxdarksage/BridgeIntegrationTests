@@ -3,6 +3,7 @@ package org.sagebionetworks.bridge.sdk.integration;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.sagebionetworks.bridge.sdk.integration.Tests.PASSWORD;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_1;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
 
@@ -68,17 +69,18 @@ public class ExternalIdSignUpTest {
             SignUp signUp = new SignUp();
             Enrollment en1 = new Enrollment().studyId(STUDY_ID_1).externalId(externalId1);
             signUp.setEnrollment(en1);
+            signUp.setPassword(PASSWORD);
             
             // You can't enroll yourself in a study without signing a consent...we need
             // a researcher to enroll you.
             devResearcher.getClient(ParticipantsApi.class).createParticipant(signUp).execute();
             
-            ExternalIdentifierList list = devIdsClient.getExternalIds(null, 5, externalId1, null).execute().body();
+            ExternalIdentifierList list = devIdsClient.getExternalIds(null, 5, externalId1).execute().body();
             assertEquals(1, list.getItems().size());
             assertTrue(list.getItems().get(0).isAssigned());
             
             // Prove you can sign in with this account (status = enabled)
-            SignIn signIn = new SignIn().externalId(externalId1).appId(TEST_APP_ID).password(Tests.PASSWORD);
+            SignIn signIn = new SignIn().externalId(externalId1).appId(TEST_APP_ID).password(PASSWORD);
             try {
                 authClient.signInV4(signIn).execute().body();
                 fail("Should have thrown exception.");
@@ -90,25 +92,12 @@ public class ExternalIdSignUpTest {
             
             // Request an auto-generated password
             GeneratedPassword generatedPassword1 = researchersClient.generatePassword(
-                    externalId1, false).execute().body();
+                    externalId1).execute().body();
             signIn.password(generatedPassword1.getPassword());
             try {
                 authClient.signInV4(signIn).execute().body();
                 fail("Should have thrown exception.");
             } catch(ConsentRequiredException e) {
-                // still not consented, has succeeded
-            }
-            
-            // Let's do that again, with otherExternalId, and ask for the account to be created.
-            GeneratedPassword generatedPassword2 = researchersClient.generatePassword(
-                    externalId2, true).execute().body();
-            SignIn signIn2 = new SignIn().externalId(externalId2).appId(TEST_APP_ID)
-                    .password(generatedPassword2.getPassword());
-            try {
-                authClient.signInV4(signIn2).execute().body();
-                fail("Should have thrown exception.");
-            } catch(ConsentRequiredException e) {
-                userId2 = e.getSession().getId();
                 // still not consented, has succeeded
             }
             
@@ -121,7 +110,7 @@ public class ExternalIdSignUpTest {
             devResearcher.getClient(ParticipantsApi.class).createParticipant(signUp).execute();
             
             GeneratedPassword generatedPassword3 = researchersClient.generatePassword(
-                    externalId3, false).execute().body();
+                    externalId3).execute().body();
             SignIn signIn3 = new SignIn().externalId(externalId3).appId(TEST_APP_ID)
                     .password(generatedPassword3.getPassword());
             try {

@@ -24,7 +24,6 @@ import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.api.StudiesApi;
-import org.sagebionetworks.bridge.rest.exceptions.BadRequestException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.exceptions.InvalidEntityException;
 import org.sagebionetworks.bridge.rest.model.Enrollment;
@@ -39,26 +38,17 @@ import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
 
-import com.google.common.collect.ImmutableSet;
-
 public class StudyTest {
     
     private List<String> studyIdsToDelete = new ArrayList<>();
     private List<String> userIdsToDelete = new ArrayList<>();
-    private TestUser testResearcher;
+    private TestUser researcher;
     private TestUser admin;
     
     @Before
     public void before() throws Exception {
         admin = TestUserHelper.getSignedInAdmin();
-        testResearcher = TestUserHelper.createAndSignInUser(StudyTest.class, false, Role.RESEARCHER);
-    }
-    
-    @After
-    public void deleteResearcher() throws Exception {
-        if (testResearcher != null) {
-            testResearcher.signOutAndDeleteUser();
-        }
+        researcher = TestUserHelper.createAndSignInUser(StudyTest.class, false, Role.RESEARCHER);
     }
     
     @After
@@ -76,7 +66,17 @@ public class StudyTest {
             } catch(EntityNotFoundException e) {
             }
         }
+        if (researcher != null) {
+            researcher.signOutAndDeleteUser();
+        }        
     }
+    
+//    @After
+//    public void deleteResearcher() throws Exception {
+//        if (testResearcher != null) {
+//            testResearcher.signOutAndDeleteUser();
+//        }
+//    }
 
     @Test
     public void test() throws IOException {
@@ -140,8 +140,7 @@ public class StudyTest {
     
     @Test
     public void usersAreTaintedByStudyAssociation() throws Exception {
-        // Create a study for this test.
-        
+        // Create two studies for this test.
         String id1 = Tests.randomIdentifier(StudyTest.class);
         Study study1 = new Study().identifier(id1).name("Study " + id1);
 
@@ -155,22 +154,18 @@ public class StudyTest {
         studyIdsToDelete.add(id2);
         admin.getClient(OrganizationsApi.class).addStudySponsorship(SAGE_ID, id1).execute();
         
-        TestUser researcherUser = new TestUserHelper.Builder(StudyTest.class)
-                .withRoles(RESEARCHER)
-                .withStudyIds(ImmutableSet.of(id1))
-                .createAndSignInUser();
-
-        userIdsToDelete.add(researcherUser.getUserId());
+        ParticipantsApi participantApi = researcher.getClient(ParticipantsApi.class);
         
-        ParticipantsApi participantApi = researcherUser.getClient(ParticipantsApi.class);
+        TestUser user = TestUserHelper.createAndSignInUser(StudyTest.class, true);
+        userIdsToDelete.add(user.getUserId());
         
         // Cannot associate this user to a non-existent sub-study
         try {
-            Enrollment en = new Enrollment().studyId("bad-id");
-            researcherUser.getClient(StudiesApi.class).enrollParticipant("bad-id", en).execute();
+            Enrollment en = new Enrollment().userId(user.getUserId()).studyId("bad-id");
+            researcher.getClient(StudiesApi.class).enrollParticipant("bad-id", en).execute();
             fail("Should have thrown exception");
         } catch(InvalidEntityException e) {
-            assertEquals("studyIds[bad-id] is not a study", e.getErrors().get("studyIds[bad-id]").get(0));
+            assertEquals("studyId is not a study", e.getErrors().get("studyId").get(0));
         }
         
         String email2 = IntegTestUtils.makeEmail(StudyTest.class);
@@ -178,17 +173,16 @@ public class StudyTest {
         
         // Cannot sign this user up because the studies include one the researcher does not possess.
         try {
-            Enrollment en2 = new Enrollment().studyId(id2);
-            researcherUser.getClient(StudiesApi.class).enrollParticipant(id2, en2).execute();
-            
-            participantApi.createParticipant(signUp2).execute().body();
+            Enrollment en2 = new Enrollment().userId(user.getUserId()).studyId(id2);
+            signUp2.enrollment(en2);
+            researcher.getClient(ParticipantsApi.class).createParticipant(signUp2).execute();
             fail("Should have thrown exception");
-        } catch(BadRequestException e) {
+        } catch(InvalidEntityException e) {
             assertTrue(e.getMessage().contains("is not a study of the caller"));
         }
         
         // User can be created if it has at least one study from the researcher creating it
-        signUp2.enrollment(new Enrollment().studyId(id1));
+        signUp2.enrollment(new Enrollment().userId(user.getUserId()).studyId(id1));
         IdentifierHolder keys = participantApi.createParticipant(signUp2).execute().body();
         userIdsToDelete.add(keys.getIdentifier());
     }

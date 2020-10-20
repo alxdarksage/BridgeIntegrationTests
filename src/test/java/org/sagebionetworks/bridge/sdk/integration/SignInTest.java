@@ -27,6 +27,7 @@ import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.model.AccountSummary;
 import org.sagebionetworks.bridge.rest.model.AccountSummaryList;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.ExternalIdentifier;
 import org.sagebionetworks.bridge.rest.model.SharingScope;
 import org.sagebionetworks.bridge.rest.model.SignUp;
@@ -88,9 +89,9 @@ public class SignInTest {
     @SuppressWarnings("deprecation")
     @Test
     public void createComplexUser() throws Exception {
-        AuthenticationApi authApi = researcher.getClient(AuthenticationApi.class);
+        //AuthenticationApi authApi = researcher.getClient(AuthenticationApi.class);
         
-        ExternalIdentifier externalId = Tests.createExternalId(SignInTest.class, developer, STUDY_ID_1);
+        Enrollment en = new Enrollment().externalId(Tests.randomIdentifier(SignInTest.class)).studyId(STUDY_ID_1);
         
         Map<String,String> map = Maps.newHashMap();
         map.put("can_be_recontacted", "true");
@@ -103,14 +104,14 @@ public class SignInTest {
         signUp.setLastName("Last Name");
         signUp.setEmail(email);
         signUp.setPassword(PASSWORD);
-        signUp.setExternalId(externalId.getIdentifier());
+        signUp.setEnrollment(en);
         signUp.setSharingScope(ALL_QUALIFIED_RESEARCHERS);
         signUp.setNotifyByEmail(true);
         signUp.setDataGroups(Lists.newArrayList("group1"));
         signUp.setLanguages(Lists.newArrayList("en"));
         signUp.setAttributes(map);
                 
-        authApi.signUp(signUp).execute();
+        new TestUserHelper.Builder(SignInTest.class).withSignUp(signUp).createAndSignInUser();
 
         ParticipantsApi participantsApi = researcher.getClient(ParticipantsApi.class);
         
@@ -122,15 +123,13 @@ public class SignInTest {
         StudyParticipant retrieved = participantsApi.getParticipantById(summary.getId(), false).execute().body();
         assertEquals("First Name", retrieved.getFirstName());
         assertEquals("Last Name", retrieved.getLastName());
-        assertTrue(retrieved.getExternalIds().values().contains(externalId.getIdentifier()));
+        assertTrue(retrieved.getExternalIds().values().contains(en.getExternalId()));
         assertEquals(signUp.getEmail(), retrieved.getEmail());
         assertEquals(SharingScope.ALL_QUALIFIED_RESEARCHERS, retrieved.getSharingScope());
         assertTrue(retrieved.isNotifyByEmail());
         assertEquals(Lists.newArrayList("group1"), retrieved.getDataGroups());
         assertEquals(Lists.newArrayList("en"), retrieved.getLanguages());
         assertEquals("true", retrieved.getAttributes().get("can_be_recontacted"));
-        
-        Tests.deleteExternalId(externalId);
         
         TestUser admin = TestUserHelper.getSignedInAdmin();
         admin.getClient(ForAdminsApi.class).deleteUser(retrieved.getId()).execute();

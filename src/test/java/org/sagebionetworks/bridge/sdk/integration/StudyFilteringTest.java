@@ -307,7 +307,7 @@ public class StudyFilteringTest {
         String userId = adminApi.createUser(signUp).execute().body().getId();
         
         for (String studyId : studyIds) {
-            Enrollment en = new Enrollment().studyId(studyId);
+            Enrollment en = new Enrollment().userId(userId);
             admin.getClient(StudiesApi.class).enrollParticipant(studyId, en).execute();
         }
         userIdsToDelete.add(userId);

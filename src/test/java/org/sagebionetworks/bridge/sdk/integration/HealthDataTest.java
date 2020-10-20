@@ -34,7 +34,7 @@ import org.sagebionetworks.bridge.rest.exceptions.BadRequestException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.model.App;
 import org.sagebionetworks.bridge.rest.model.DataType;
-import org.sagebionetworks.bridge.rest.model.ExternalIdentifier;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.GuidCreatedOnVersionHolder;
 import org.sagebionetworks.bridge.rest.model.HealthDataRecord;
 import org.sagebionetworks.bridge.rest.model.HealthDataSubmission;
@@ -64,7 +64,7 @@ public class HealthDataTest {
     private static final String SURVEY_ID = "health-data-integ-test-survey";
 
     private static TestUserHelper.TestUser developer;
-    private static ExternalIdentifier externalIdentifier;
+    private static Enrollment enrollment;
     private static AppsApi studiesApi;
     private static DateTime surveyCreatedOn;
     private static String surveyGuid;
@@ -165,9 +165,10 @@ public class HealthDataTest {
         assertNotNull(surveyCreatedOn);
 
         // Set up user with data groups, external ID, and sharing scope.
-        externalIdentifier = Tests.createExternalId(HealthDataTest.class, developer, STUDY_ID_1);
-        user = new TestUserHelper.Builder(UploadTest.class).withExternalId(externalIdentifier.getIdentifier())
-                .withConsentUser(true).createAndSignInUser();
+        
+        enrollment = new Enrollment().studyId(STUDY_ID_1).externalId(Tests.randomIdentifier(HealthDataTest.class));
+        user = new TestUserHelper.Builder(UploadTest.class).withEnrollment(enrollment).withConsentUser(true)
+                .createAndSignInUser();
         ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
 
         StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
@@ -192,7 +193,6 @@ public class HealthDataTest {
         if (developer != null) {
             developer.signOutAndDeleteUser();
         }
-        Tests.deleteExternalId(externalIdentifier);
     }
 
     private static void setUploadValidationStrictness(UploadValidationStrictness strictness) throws Exception {
@@ -232,7 +232,8 @@ public class HealthDataTest {
         assertNotNull(record.getUploadDate());
         assertNotNull(record.getUploadedOn());
         assertEquals(SharingScope.SPONSORS_AND_PARTNERS, record.getUserSharingScope());
-        assertEquals(externalIdentifier.getIdentifier(), record.getUserExternalId());
+        assertEquals(enrollment.getExternalId(), record.getUserStudyMemberships().get(STUDY_ID_1));
+        assertEquals(enrollment.getExternalId(), record.getUserExternalId());
         assertEquals(ImmutableList.of("group1"), record.getUserDataGroups());
 
         // createdOn is flattened to UTC server side.

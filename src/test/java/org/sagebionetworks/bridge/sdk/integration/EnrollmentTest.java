@@ -19,7 +19,6 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
-import org.sagebionetworks.bridge.rest.api.ExternalIdentifiersApi;
 import org.sagebionetworks.bridge.rest.api.InternalApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
@@ -27,7 +26,6 @@ import org.sagebionetworks.bridge.rest.api.StudiesApi;
 import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.EnrollmentDetailList;
 import org.sagebionetworks.bridge.rest.model.EnrollmentMigration;
-import org.sagebionetworks.bridge.rest.model.ExternalIdentifier;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
@@ -67,11 +65,12 @@ public class EnrollmentTest {
             enrollment.setExternalId(externalId);
             enrollment.setUserId(user.getUserId());
             enrollment.setConsentRequired(true);
-            Enrollment retValue = studiesApi.enrollParticipant(STUDY_ID_1, enrollment).execute().body();
+            Enrollment retValue = studiesApi.enrollParticipant(STUDY_ID_2, enrollment).execute().body();
             
             assertEquals(externalId, retValue.getExternalId());
             assertEquals(user.getUserId(), retValue.getUserId());
             assertTrue(retValue.isConsentRequired());
+            assertEquals(retValue.getStudyId(), STUDY_ID_2);
             assertEquals(timestamp.getMillis(), retValue.getEnrolledOn().getMillis());
             assertEquals(admin.getUserId(), retValue.getEnrolledBy());
             assertNull(enrollment.getWithdrawnOn());
@@ -79,13 +78,13 @@ public class EnrollmentTest {
             assertNull(enrollment.getWithdrawalNote());
             
             // Now shows up in paged api
-            EnrollmentDetailList list = studiesApi.getEnrollees(STUDY_ID_1, "enrolled", false, null, null).execute().body();
+            EnrollmentDetailList list = studiesApi.getEnrollees(STUDY_ID_2, "enrolled", false, null, null).execute().body();
             assertTrue(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
             
-            list = studiesApi.getEnrollees(STUDY_ID_1, null, false, null, null).execute().body();
+            list = studiesApi.getEnrollees(STUDY_ID_2, null, false, null, null).execute().body();
             assertTrue(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
             
-            retValue = studiesApi.withdrawParticipant(STUDY_ID_1, user.getUserId(), 
+            retValue = studiesApi.withdrawParticipant(STUDY_ID_2, user.getUserId(), 
                     "Testing enrollment and withdrawal.").execute().body();
             assertEquals(user.getUserId(), retValue.getUserId());
             assertTrue(retValue.isConsentRequired());
@@ -95,7 +94,7 @@ public class EnrollmentTest {
             assertEquals(admin.getUserId(), retValue.getWithdrawnBy());
             assertEquals("Testing enrollment and withdrawal.", retValue.getWithdrawalNote());
             
-            list = studiesApi.getEnrollees(STUDY_ID_1, "enrolled", false, null, null).execute().body();
+            list = studiesApi.getEnrollees(STUDY_ID_2, "enrolled", false, null, null).execute().body();
             assertFalse(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
             
             // This person is accessible via the external ID.
@@ -104,20 +103,20 @@ public class EnrollmentTest {
             assertEquals(user.getUserId(), participant.getId());
             
             // It is still in the paged API, despite being withdrawn.
-            list = studiesApi.getEnrollees(STUDY_ID_1, "withdrawn", false, null, null).execute().body();
+            list = studiesApi.getEnrollees(STUDY_ID_2, "withdrawn", false, null, null).execute().body();
             assertTrue(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
             
-            list = studiesApi.getEnrollees(STUDY_ID_1, "all", false, null, null).execute().body();
+            list = studiesApi.getEnrollees(STUDY_ID_2, "all", false, null, null).execute().body();
             assertTrue(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
             
             // test the filter for test accounts
             participant.addDataGroupsItem("test_user");
             admin.getClient(ParticipantsApi.class).updateParticipant(participant.getId(), participant).execute();
             
-            list = studiesApi.getEnrollees(STUDY_ID_1, "all", false, null, null).execute().body();
+            list = studiesApi.getEnrollees(STUDY_ID_2, "all", false, null, null).execute().body();
             assertFalse(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
             
-            list = studiesApi.getEnrollees(STUDY_ID_1, "all", true, null, null).execute().body();
+            list = studiesApi.getEnrollees(STUDY_ID_2, "all", true, null, null).execute().body();
             assertTrue(list.getItems().stream().anyMatch(e -> e.getParticipant().getIdentifier().equals(user.getUserId())));
         } finally {
             user.signOutAndDeleteUser();
@@ -127,7 +126,6 @@ public class EnrollmentTest {
     @Test
     public void adminApisToMigrateEnrollments() throws Exception {
         InternalApi internalApi = admin.getClient(InternalApi.class);
-        ExternalIdentifiersApi extIdsApi = admin.getClient(ExternalIdentifiersApi.class);
         ParticipantsApi participantsApi = admin.getClient(ParticipantsApi.class);
         
         DateTime timestamp = new DateTime();
@@ -135,11 +133,8 @@ public class EnrollmentTest {
         // Create a user and enroll them in two studies using the default consent and an external ID. 
         // Then we'll remove them from one.
         TestUser user = TestUserHelper.createAndSignInUser(EnrollmentTest.class, true);
-        ExternalIdentifier extId2 = new ExternalIdentifier().studyId(STUDY_ID_2)
-                .identifier(randomIdentifier(EnrollmentTest.class));
+        String extId2 = randomIdentifier(EnrollmentTest.class);
         try {
-            extIdsApi.createExternalId(extId2).execute();
-            
             StudyParticipant participant = participantsApi.getParticipantById(user.getUserId(), false).execute().body();
             List<EnrollmentMigration> migrations = internalApi.getEnrollmentMigrations(participant.getId()).execute().body();
             
@@ -157,7 +152,7 @@ public class EnrollmentTest {
             enrollInStudy2.setStudyId(STUDY_ID_2);
             enrollInStudy2.setEnrolledBy(admin.getUserId());
             enrollInStudy2.setEnrolledOn(timestamp);
-            enrollInStudy2.setExternalId(extId2.getIdentifier());
+            enrollInStudy2.setExternalId(extId2);
             enrollInStudy2.setUserId(user.getUserId());
             migrations.add(enrollInStudy2);
             
@@ -165,7 +160,7 @@ public class EnrollmentTest {
             
             participant = participantsApi.getParticipantById(user.getUserId(), false).execute().body();
             
-            assertEquals(extId2.getIdentifier(), participant.getExternalIds().get(STUDY_ID_2));
+            assertEquals(extId2, participant.getExternalIds().get(STUDY_ID_2));
             assertEquals(ImmutableList.of(STUDY_ID_2), participant.getStudyIds());
             
             migrations = internalApi.getEnrollmentMigrations(participant.getId()).execute().body();
@@ -181,7 +176,6 @@ public class EnrollmentTest {
             assertEquals(timestamp.getMillis(), enrollment1.getWithdrawnOn().getMillis());
             assertNull(enrollment2.getWithdrawnOn());
         } finally {
-            extIdsApi.deleteExternalId(extId2.getIdentifier()).execute();
             user.signOutAndDeleteUser();
         }
     }

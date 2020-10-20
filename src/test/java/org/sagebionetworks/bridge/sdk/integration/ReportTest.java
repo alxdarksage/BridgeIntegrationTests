@@ -9,6 +9,7 @@ import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
 import static org.sagebionetworks.bridge.rest.model.Role.RESEARCHER;
 import static org.sagebionetworks.bridge.rest.model.Role.WORKER;
+import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_2;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_1;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_2;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
@@ -17,7 +18,6 @@ import java.util.Map;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 
 import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
@@ -32,6 +32,7 @@ import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.ForDevelopersApi;
 import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
 import org.sagebionetworks.bridge.rest.api.ForWorkersApi;
+import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantReportsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.api.StudyReportsApi;
@@ -457,8 +458,9 @@ public class ReportTest {
         devReportClient.addStudyReportRecord(reportId, data2).execute();
         
         // Not a member of the study used for these report records
-        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
-                .withStudyIds(ImmutableSet.of(STUDY_ID_2)).createAndSignInUser();
+        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false).createAndSignInUser();
+        admin.getClient(OrganizationsApi.class).addMember(ORG_ID_2, studyScopedUser.getUserId()).execute();        
+        
         StudyReportsApi reportsApi = studyScopedUser.getClient(StudyReportsApi.class);
         ReportIndex index = reportsApi.getStudyReportIndex(reportId).execute().body();
         assertTrue(index.getStudyIds().contains(STUDY_ID_1));
@@ -503,8 +505,8 @@ public class ReportTest {
     public void participantReportsNotVisibleOutsideOfStudy() throws Exception {
         // It would seem to be dumb to create reports for a participant that are associated to studies such that the
         // user will not be able to see them. Nevertheless, if it happens, we enforce visibility constraints.
-        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
-                .withStudyIds(ImmutableSet.of(STUDY_ID_2)).createAndSignInUser();
+        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false).createAndSignInUser();
+        admin.getClient(OrganizationsApi.class).addMember(ORG_ID_2, studyScopedUser.getUserId()).execute();
         
         String healthCode = worker.getClient(ParticipantsApi.class)
                 .getParticipantById(studyScopedUser.getUserId(), false).execute().body().getHealthCode();

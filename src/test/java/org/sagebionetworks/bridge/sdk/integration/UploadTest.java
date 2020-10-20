@@ -30,18 +30,16 @@ import org.sagebionetworks.bridge.json.DefaultObjectMapper;
 import org.sagebionetworks.bridge.rest.RestUtils;
 import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
-import org.sagebionetworks.bridge.rest.api.ForResearchersApi;
 import org.sagebionetworks.bridge.rest.api.ForWorkersApi;
 import org.sagebionetworks.bridge.rest.api.UploadSchemasApi;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.exceptions.UnauthorizedException;
-import org.sagebionetworks.bridge.rest.model.ExternalIdentifier;
+import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.HealthDataRecord;
 import org.sagebionetworks.bridge.rest.model.RecordExportStatusRequest;
 import org.sagebionetworks.bridge.rest.model.Role;
 import org.sagebionetworks.bridge.rest.model.SharingScope;
 import org.sagebionetworks.bridge.rest.model.SignUp;
-import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.SynapseExporterStatus;
 import org.sagebionetworks.bridge.rest.model.Upload;
@@ -53,7 +51,6 @@ import org.sagebionetworks.bridge.rest.model.UploadSchemaType;
 import org.sagebionetworks.bridge.rest.model.UploadSession;
 import org.sagebionetworks.bridge.rest.model.UploadStatus;
 import org.sagebionetworks.bridge.rest.model.UploadValidationStatus;
-import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
 
@@ -64,6 +61,7 @@ import com.google.common.collect.Lists;
 public class UploadTest {
     
     private static final String EXTERNAL_ID = "upload-test-extid";
+    private static final Enrollment EXT_ID = new Enrollment().externalId(EXTERNAL_ID).studyId(STUDY_ID_1);
     
     // On a cold server, validation could take up to 8 seconds (most of this is downloading and caching the encryption
     // certs for the first time). Subsequent validation attempts take about 2 seconds. 5 second delay is a good
@@ -85,14 +83,6 @@ public class UploadTest {
     public static void beforeClass() throws Exception {
         admin = TestUserHelper.getSignedInAdmin();
 
-        try {
-            admin.getClient(ForAdminsApi.class).getStudy(STUDY_ID_1).execute();
-        } catch(EntityNotFoundException e) {
-            Study study = new Study().name(STUDY_ID_1).identifier(STUDY_ID_1);
-            VersionHolder version = admin.getClient(ForAdminsApi.class).createStudy(study).execute().body();
-            study.setVersion(version.getVersion());
-        }
-        
         // developer is to ensure schemas exist. user is to do uploads
         worker = TestUserHelper.createAndSignInUser(UploadTest.class, false, Role.WORKER);
         developer = TestUserHelper.createAndSignInUser(UploadTest.class, false, Role.DEVELOPER);
@@ -100,13 +90,10 @@ public class UploadTest {
         researcher = TestUserHelper.createAndSignInUser(UploadTest.class, false, Role.RESEARCHER);
         studyAdmin = TestUserHelper.createAndSignInUser(UploadTest.class, false, Role.ADMIN);
 
-        ExternalIdentifier extId = new ExternalIdentifier().identifier(EXTERNAL_ID).studyId(STUDY_ID_1);
-        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
-        researchersApi.createExternalId(extId).execute();
-        
         String emailAddress = IntegTestUtils.makeEmail(UploadTest.class);
         SignUp signUp = new SignUp().email(emailAddress).password(Tests.PASSWORD);
-        signUp.setExternalId(EXTERNAL_ID); // which should, in turn, associate account to STUDY_ID.
+        
+        signUp.setEnrollment(EXT_ID);
         user = TestUserHelper.createAndSignInUser(UploadTest.class, true, signUp);
 
         // ensure schemas exist, so we have something to upload against

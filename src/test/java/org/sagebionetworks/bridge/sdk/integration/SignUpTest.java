@@ -2,26 +2,20 @@ package org.sagebionetworks.bridge.sdk.integration;
 
 import org.junit.Test;
 import org.sagebionetworks.bridge.rest.api.AuthenticationApi;
-import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.exceptions.BadRequestException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
-import org.sagebionetworks.bridge.rest.exceptions.InvalidEntityException;
-import org.sagebionetworks.bridge.rest.model.App;
 import org.sagebionetworks.bridge.rest.model.SharingScope;
 import org.sagebionetworks.bridge.rest.model.SignIn;
-import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
-import org.sagebionetworks.bridge.util.IntegTestUtils;
 
 import java.io.IOException;
 
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 
 public class SignUpTest {
 
@@ -81,41 +75,6 @@ public class SignUpTest {
             authApi.requestResetPassword(email).execute();
         } finally {
             testUser.signOutAndDeleteUser();
-        }
-    }
-    
-    @Test
-    public void signUpForAppWithExternalIdValidation() throws Exception {
-        App app = Tests.getApp(Tests.randomIdentifier(SignUpTest.class), null);
-        app.setExternalIdRequiredOnSignup(true);
-        
-        TestUser admin = TestUserHelper.getSignedInAdmin();
-        
-        ForSuperadminsApi superadminApi = admin.getClient(ForSuperadminsApi.class);
-        superadminApi.createApp(app).execute();
-
-        SignUp signUp = new SignUp()
-                .appId(app.getIdentifier())
-                .email(IntegTestUtils.makeEmail(SignUpTest.class))
-                .password("P@ssword`1");
-        AuthenticationApi authApi = admin.getClient(AuthenticationApi.class);
-        try {
-            try {
-                authApi.signUp(signUp).execute();
-                fail("Should have thrown exception");
-            } catch(InvalidEntityException e) {
-                assertEquals("StudyParticipant is invalid: externalId is required", e.getMessage());
-            }
-            try {
-                // Wrong ID. We can't add an ID to this app, as we can't add a user.
-                signUp.setExternalId("ABC");
-                authApi.signUp(signUp).execute();
-                fail("Should have thrown exception");
-            } catch(InvalidEntityException e) {
-                assertEquals("externalId is not a valid external ID", e.getErrors().get("externalId").get(0));
-            }
-        } finally {
-            superadminApi.deleteApp(app.getIdentifier(), true).execute();
         }
     }
 }

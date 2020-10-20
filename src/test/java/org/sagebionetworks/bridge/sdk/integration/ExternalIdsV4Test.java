@@ -1,8 +1,7 @@
 package org.sagebionetworks.bridge.sdk.integration;
 
+import static java.util.stream.Collectors.toSet;
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertFalse;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
@@ -12,7 +11,9 @@ import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_1;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_2;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.stream.Collectors;
 
 import org.apache.commons.lang3.RandomStringUtils;
@@ -39,6 +40,7 @@ import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 
+import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import retrofit2.Response;
@@ -83,10 +85,8 @@ public class ExternalIdsV4Test {
             // Sign up a user with an external ID specified. Just one of them: we don't have plans to
             // allow the assignment of multiple external IDs on sign up. Adding new studies is probably
             // going to happen by signing additional consents, but that's TBD.
-            SignUp signUp = new SignUp().appId(TEST_APP_ID);
-            signUp.setPassword(Tests.PASSWORD);
             Enrollment enA = new Enrollment().studyId(STUDY_ID_1).externalId(extIdA);
-            signUp.enrollment(enA);
+            SignUp signUp = new SignUp().appId(TEST_APP_ID).password(Tests.PASSWORD).enrollment(enA);
             researcher.getClient(AuthenticationApi.class).signUp(signUp).execute();
 
             // The created account has been associated to the external ID and its related study
@@ -106,26 +106,12 @@ public class ExternalIdsV4Test {
             assertEquals(userId, participant2.getId());
             
             // verify filtering by assignment since we have assigned one record
-            ExternalIdentifierList all = researcherApi.getExternalIds(null, 50, prefix, null).execute().body();
-            
-            ExternalIdentifierList assigned = researcherApi.getExternalIds(null, 50, prefix, true).execute().body();
-            assertEquals(1, assigned.getItems().size());
-            for (ExternalIdentifier id : assigned.getItems()) {
-                assertTrue(id.isAssigned());
-            }
-
-            // In this test only, all=2 so assigned and unassigned are both 1, but there can be external IDs
-            // in the test app left over from test failures, manual testing, etc.
-            ExternalIdentifierList unassigned = researcherApi.getExternalIds(null, 50, prefix, false).execute().body();
-            assertEquals(all.getItems().size()-1, unassigned.getItems().size());
-            for (ExternalIdentifier id : unassigned.getItems()) {
-                assertFalse(id.isAssigned());
-            }
+            ExternalIdentifierList all = researcherApi.getExternalIds(null, 50, prefix).execute().body();
 
             // Assign a second external ID to an existing account. This should work, and then both IDs should 
             // be usable to retrieve the account (demonstrating that this is not simply because in the interim 
             // while migrating, we're writing the external ID to the singular externalId field).
-            Enrollment enB = new Enrollment().studyId(STUDY_ID_2).externalId(extIdB);
+            Enrollment enB = new Enrollment().studyId(STUDY_ID_2).externalId(extIdB).userId(userId);
             admin.getClient(StudiesApi.class).enrollParticipant(STUDY_ID_2, enB).execute();
             
             SignIn signIn = new SignIn().appId(TEST_APP_ID);
@@ -164,44 +150,40 @@ public class ExternalIdsV4Test {
             for (int i=0; i < 10; i++) {
                 researcherApi.createExternalId(ids.get(i)).execute();    
             }
+            
+            Set<String> allIds = researcherApi.getExternalIds(null, 100, prefix).execute().body()
+                    .getItems().stream().map(ExternalIdentifier::getIdentifier).collect(Collectors.toSet());
+            
+            Set<String> collectedIds = new HashSet<>();
+            
             // pageSize=3, should have 4 pages 
-            ExternalIdentifierList list = researcherApi.getExternalIds(null, 3, prefix, null).execute().body();
-            assertEquals(3, list.getItems().size());
-            assertEquals(ids.get(0).getIdentifier(), list.getItems().get(0).getIdentifier());
-            assertEquals(ids.get(1).getIdentifier(), list.getItems().get(1).getIdentifier());
-            assertEquals(ids.get(2).getIdentifier(), list.getItems().get(2).getIdentifier());
-            
-            list = researcherApi.getExternalIds(list.getNextPageOffsetKey(), 3, prefix, null).execute().body();
-            assertEquals(3, list.getItems().size());
-            assertEquals(ids.get(3).getIdentifier(), list.getItems().get(0).getIdentifier());
-            assertEquals(ids.get(4).getIdentifier(), list.getItems().get(1).getIdentifier());
-            assertEquals(ids.get(5).getIdentifier(), list.getItems().get(2).getIdentifier());
-            
-            list = researcherApi.getExternalIds(list.getNextPageOffsetKey(), 3, prefix, null).execute().body();
-            assertEquals(3, list.getItems().size());
-            assertEquals(ids.get(6).getIdentifier(), list.getItems().get(0).getIdentifier());
-            assertEquals(ids.get(7).getIdentifier(), list.getItems().get(1).getIdentifier());
-            assertEquals(ids.get(8).getIdentifier(), list.getItems().get(2).getIdentifier());
-            
-            list = researcherApi.getExternalIds(list.getNextPageOffsetKey(), 3, prefix, null).execute().body();
-            assertEquals(1, list.getItems().size());
-            assertEquals(ids.get(9).getIdentifier(), list.getItems().get(0).getIdentifier());
+            for (int i=0; i < 10; i += 3) {
+                ExternalIdentifierList list = researcherApi.getExternalIds(i, 3, prefix).execute().body();
+                for (ExternalIdentifier oneId : list.getItems()) {
+                    collectedIds.add(oneId.getIdentifier());
+                }
+            }
+            assertEquals(allIds, collectedIds);
             
             // pageSize = 10, one page with no offset key
-            list = researcherApi.getExternalIds(null, 10, prefix, null).execute().body();
+            ExternalIdentifierList list = researcherApi.getExternalIds(null, 10, prefix).execute().body();
             assertEquals(10, list.getItems().size());
-            assertNull(list.getNextPageOffsetKey());
-            for (int i=0; i < 10; i++) {
-                assertEquals(ids.get(i).getIdentifier(), list.getItems().get(i).getIdentifier());
+            assertEquals(Integer.valueOf(0), Integer.valueOf( list.getRequestParams().getOffsetBy()) );
+            collectedIds.clear();
+            for (ExternalIdentifier oneId : list.getItems()) {
+                collectedIds.add(oneId.getIdentifier());
             }
+            assertEquals(allIds, collectedIds);
             
             // pageSize = 30, same thing
-            list = researcherApi.getExternalIds(null, 30, prefix, null).execute().body();
+            list = researcherApi.getExternalIds(null, 30, prefix).execute().body();
             assertEquals(10, list.getItems().size());
-            assertNull(list.getNextPageOffsetKey());
-            for (int i=0; i < 10; i++) {
-                assertEquals(ids.get(i).getIdentifier(), list.getItems().get(i).getIdentifier());
+            assertEquals(Integer.valueOf(0), Integer.valueOf( list.getRequestParams().getOffsetBy()) );
+            collectedIds.clear();
+            for (ExternalIdentifier oneId : list.getItems()) {
+                collectedIds.add(oneId.getIdentifier());
             }
+            assertEquals(allIds, collectedIds);
             
             // Create a researcher in org 1 that sponsors only study 1, and retrieving external IDs
             // should be filtered
@@ -211,17 +193,16 @@ public class ExternalIdsV4Test {
             admin.getClient(OrganizationsApi.class).addMember(ORG_ID_1, user.getUserId()).execute();
             
             ForResearchersApi scopedResearcherApi = user.getClient(ForResearchersApi.class);
-            ExternalIdentifierList scopedList = scopedResearcherApi.getExternalIds(null, null, null, null)
+            ExternalIdentifierList scopedList = scopedResearcherApi.getExternalIds(null, null, null)
                     .execute().body();
             
-            // Only five of them have the study ID
+            // Only five of them have study ID 1
             assertEquals(5, scopedList.getItems().stream()
-                    .filter(id -> id.getStudyId() != null).collect(Collectors.toList()).size());
+                    .filter(id -> id.getStudyId().equals(STUDY_ID_1)).collect(Collectors.toList()).size());
             
             // You can also filter the ids and it maintains the study scoping
-            scopedList = scopedResearcherApi.getExternalIds(null, null, prefix+"-foo-", null).execute().body();
-            
-            assertEquals(2, scopedList.getItems().stream()
+            scopedList = scopedResearcherApi.getExternalIds(null, null, prefix+"-foo-").execute().body();
+            assertEquals(4, scopedList.getItems().stream()
                     .filter(id -> id.getStudyId() != null).collect(Collectors.toList()).size());
         } finally {
             if (user != null) {
@@ -232,5 +213,9 @@ public class ExternalIdsV4Test {
             }
         }
     }
-
+    
+    private Set<String> getIdentifierSet(List<ExternalIdentifier> list, int offset) {
+        return list.subList(offset, offset+3).stream()
+                .map(ExternalIdentifier::getIdentifier).collect(toSet());
+    }
 }
