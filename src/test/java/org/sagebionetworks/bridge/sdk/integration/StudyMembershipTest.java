@@ -1,7 +1,6 @@
 package org.sagebionetworks.bridge.sdk.integration;
 
 import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.Role.ADMIN;
 import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
 import static org.sagebionetworks.bridge.rest.model.Role.RESEARCHER;
@@ -22,7 +21,6 @@ import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.api.StudiesApi;
-import org.sagebionetworks.bridge.rest.exceptions.ConstraintViolationException;
 import org.sagebionetworks.bridge.rest.model.App;
 import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.EnrollmentDetailList;
@@ -171,18 +169,14 @@ public class StudyMembershipTest {
         assertEquals(extIdB.getExternalId(), session.getExternalIds().get(idB));
         
         // But you cannot change an ID once set just by updating the account
-        try {
-            admin.getClient(StudiesApi.class).enrollParticipant(extIdA2.getStudyId(), extIdA2).execute();
-            participant = admin.getClient(ParticipantsApi.class)
-                    .getParticipantById(user.getUserId(), false).execute().body();
-            session = userApi.updateUsersParticipantRecord(participant).execute().body();
-            System.out.println(extIdA1.getExternalId());
-            System.out.println(extIdA2.getExternalId());
-            System.out.println(session);
-            fail("Should have thrown exception");
-        } catch(ConstraintViolationException e) {
-            assertEquals("Account already associated to study.", e.getMessage());
-        }
+        participant = admin.getClient(ParticipantsApi.class).getParticipantById(user.getUserId(), false)
+                .execute().body();
+        participant.setEnrollment(extIdA2);
+        session = userApi.updateUsersParticipantRecord(participant).execute().body();
+            
+        // has not changed
+        assertEquals(extIdA1.getExternalId(), session.getExternalIds().get(idA));
+        assertEquals(extIdB.getExternalId(), session.getExternalIds().get(idB));
     }
 
     private String createStudy() throws Exception {

@@ -40,7 +40,6 @@ import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Lists;
 
 import retrofit2.Response;

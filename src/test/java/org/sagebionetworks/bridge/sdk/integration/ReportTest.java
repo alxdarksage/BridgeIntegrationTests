@@ -104,7 +104,7 @@ public class ReportTest {
 
     @After
     public void after() throws Exception {
-        ForDevelopersApi developerApi = developer.getClient(ForDevelopersApi.class);
+        ForDevelopersApi developerApi = admin.getClient(ForDevelopersApi.class);
         developerApi.deleteAllStudyReportRecords(reportId).execute();
 
         admin.getClient(ForAdminsApi.class).deleteParticipantReportIndex(reportId).execute();
