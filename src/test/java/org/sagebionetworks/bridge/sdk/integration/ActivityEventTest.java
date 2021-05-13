@@ -20,6 +20,8 @@ import java.util.Map;
 import java.util.Optional;
 import java.util.stream.Collectors;
 
+import com.google.common.collect.ImmutableSet;
+
 import org.joda.time.DateTime;
 import org.joda.time.DateTimeZone;
 import org.joda.time.Period;
@@ -36,6 +38,10 @@ import org.sagebionetworks.bridge.rest.model.ActivityEventList;
 import org.sagebionetworks.bridge.rest.model.App;
 import org.sagebionetworks.bridge.rest.model.CustomActivityEventRequest;
 import org.sagebionetworks.bridge.rest.model.Role;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEvent;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEventList;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEventPagedList;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEventRequest;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 
@@ -238,7 +244,7 @@ public class ActivityEventTest {
     }
     
     @Test
-    public void createActivityEventScopedForStudy() throws Exception {
+    public void createStudyActivityEvent() throws Exception {
         // Because this is set first, it is immutable and will not be changed by the study-scoped value.
         // Both with exist side-by-side
         DateTime globalTimestamp = DateTime.now(UTC).minusDays(2);
@@ -247,20 +253,20 @@ public class ActivityEventTest {
         researchersApi.createActivityEventForParticipant(user.getUserId(), globalRequest).execute();
         
         DateTime studyScopedTimestamp = DateTime.now(UTC);  
-        CustomActivityEventRequest studyScopedRequest = new CustomActivityEventRequest()
+        StudyActivityEventRequest studyScopedRequest = new StudyActivityEventRequest()
             .eventId(EVENT_KEY1).timestamp(studyScopedTimestamp);
-        researchersApi.createStudyParticipantActivityEvent(STUDY_ID_1, user.getUserId(), studyScopedRequest).execute();
+        researchersApi.createStudyParticipantStudyActivityEvent(STUDY_ID_1, user.getUserId(), studyScopedRequest).execute();
         
         ActivityEventList globalList = researchersApi.getActivityEventsForParticipant(user.getUserId()).execute().body();
         ActivityEvent globalEvent = findEventByKey(globalList, "custom:"+EVENT_KEY1);
         assertEquals(globalTimestamp, globalEvent.getTimestamp());
         
-        ActivityEventList scopedList = researchersApi.getStudyParticipantActivityEvents(STUDY_ID_1, user.getUserId()).execute().body();
-        ActivityEvent scopedEvent = findEventByKey(scopedList, "custom:"+EVENT_KEY1);
+        StudyActivityEventList scopedList = researchersApi.getStudyParticipantStudyActivityEvents(STUDY_ID_1, user.getUserId()).execute().body();
+        StudyActivityEvent scopedEvent = findEventByKey(scopedList, "custom:"+EVENT_KEY1);
         assertEquals(studyScopedTimestamp, scopedEvent.getTimestamp());
 
         // User can also retrieve these two different events.
-        scopedList = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        scopedList = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         scopedEvent = findEventByKey(scopedList, "custom:"+EVENT_KEY1);
         assertEquals(studyScopedTimestamp, scopedEvent.getTimestamp());
         
@@ -274,11 +280,11 @@ public class ActivityEventTest {
         usersApi.createCustomActivityEvent(globalRequest).execute();
         
         studyScopedTimestamp = studyScopedTimestamp.minusWeeks(2);
-        studyScopedRequest = new CustomActivityEventRequest().eventId(EVENT_KEY2).timestamp(studyScopedTimestamp);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, studyScopedRequest).execute();
+        studyScopedRequest = new StudyActivityEventRequest().eventId(EVENT_KEY2).timestamp(studyScopedTimestamp);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, studyScopedRequest).execute();
 
         // user can see these events
-        scopedList = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        scopedList = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         scopedEvent = findEventByKey(scopedList, "custom:"+EVENT_KEY2);
         assertEquals(studyScopedTimestamp, scopedEvent.getTimestamp());
         
@@ -291,7 +297,7 @@ public class ActivityEventTest {
         globalEvent = findEventByKey(globalList, "custom:"+EVENT_KEY2);
         assertEquals(globalTimestamp, globalEvent.getTimestamp());
         
-        scopedList = researchersApi.getStudyParticipantActivityEvents(STUDY_ID_1, user.getUserId()).execute().body();
+        scopedList = researchersApi.getStudyParticipantStudyActivityEvents(STUDY_ID_1, user.getUserId()).execute().body();
         scopedEvent = findEventByKey(scopedList, "custom:"+EVENT_KEY2);
         assertEquals(studyScopedTimestamp, scopedEvent.getTimestamp());
     }
@@ -303,12 +309,13 @@ public class ActivityEventTest {
                 .eventId(EVENT_KEY1).timestamp(globalTimestamp);
         researchersApi.createActivityEventForParticipant(user.getUserId(), globalRequest).execute();
 
-        ActivityEventList scopedList = researchersApi.getStudyParticipantActivityEvents(STUDY_ID_1, user.getUserId()).execute().body();
+        StudyActivityEventList scopedList = researchersApi.getStudyParticipantStudyActivityEvents(
+                STUDY_ID_1, user.getUserId()).execute().body();
         assertNull(findEventByKey(scopedList, "custom:"+EVENT_KEY1));
 
         // The user has not been enrolled in this study so there should be no events.
         try {
-            researchersApi.getStudyParticipantActivityEvents(STUDY_ID_2, user.getUserId()).execute().body();
+            researchersApi.getStudyParticipantStudyActivityEvents(STUDY_ID_2, user.getUserId()).execute().body();
             fail("Should have thrown an exception.");
         } catch(EntityNotFoundException e) {
             
@@ -417,29 +424,49 @@ public class ActivityEventTest {
         DateTime futureTime = DateTime.now(DateTimeZone.UTC).plusHours(2);
 
         // Create event #1 which is mutable
-        CustomActivityEventRequest req = new CustomActivityEventRequest().eventId(EVENT_KEY1).timestamp(now);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req).execute();
+        StudyActivityEventRequest req = new StudyActivityEventRequest().eventId(EVENT_KEY1).timestamp(now);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req).execute();
         
-        ActivityEventList list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        StudyActivityEventList list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(now, getTimestamp(list, EVENT_KEY1));
         
         // future time updates
-        req = new CustomActivityEventRequest().eventId(EVENT_KEY1).timestamp(futureTime);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req).execute();
-        list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        req = new StudyActivityEventRequest().eventId(EVENT_KEY1).timestamp(futureTime);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req).execute();
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(futureTime, getTimestamp(list, EVENT_KEY1));
 
         // past time updates
-        req = new CustomActivityEventRequest().eventId(EVENT_KEY1).timestamp(pastTime);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req).execute();
-        list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        req = new StudyActivityEventRequest().eventId(EVENT_KEY1).timestamp(pastTime);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req).execute();
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(pastTime, getTimestamp(list, EVENT_KEY1));
+        
+        // This will have accumulated three events
+        StudyActivityEventPagedList page = usersApi.getStudyActivityEventHistory(
+                STUDY_ID_1, EVENT_KEY1, null, null).execute().body();
+        assertEquals(3, page.getItems().size());
+        assertEquals(Integer.valueOf(3), page.getTotal());
+        assertEquals(ImmutableSet.of(now, pastTime, futureTime), page.getItems().stream()
+                .map(StudyActivityEvent::getTimestamp).collect(Collectors.toSet()));
+        
+        // These are counted in the record total
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
+        assertEquals(Integer.valueOf(3), findEventByKey(list, "custom:"+EVENT_KEY1).getRecordCount());
 
         // can delete
-        usersApi.deleteActivityEventForSelf(STUDY_ID_1, EVENT_KEY1).execute();
+        usersApi.deleteStudyActivityEvent(STUDY_ID_1, EVENT_KEY1).execute();
         
-        list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertNull(getTimestamp(list, EVENT_KEY1));
+        
+        // Cannot retrieve events for study 2.
+        try {
+            usersApi.getStudyActivityEvents(STUDY_ID_2).execute().body();
+            fail("Should have thrown exception");
+        } catch(EntityNotFoundException e) {
+            assertEquals("Account not found.", e.getMessage());
+        }
     }
 
     @Test
@@ -449,28 +476,34 @@ public class ActivityEventTest {
         DateTime futureTime = DateTime.now(DateTimeZone.UTC).plusHours(2);
 
         // Create event #2 which is immutable.
-        CustomActivityEventRequest req = new CustomActivityEventRequest().eventId(EVENT_KEY2).timestamp(now);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req).execute();
-        ActivityEventList list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        StudyActivityEventRequest req = new StudyActivityEventRequest().eventId(EVENT_KEY2).timestamp(now);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req).execute();
+        StudyActivityEventList list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(now, getTimestamp(list, EVENT_KEY2));
 
         // past time won't update
-        req = new CustomActivityEventRequest().eventId(EVENT_KEY2).timestamp(pastTime);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req).execute();
-        list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        req = new StudyActivityEventRequest().eventId(EVENT_KEY2).timestamp(pastTime);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req).execute();
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(getTimestamp(list, EVENT_KEY2), now);
 
         // future time won't update
-        req = new CustomActivityEventRequest().eventId(EVENT_KEY2).timestamp(futureTime);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req).execute();
-        list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        req = new StudyActivityEventRequest().eventId(EVENT_KEY2).timestamp(futureTime);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req).execute();
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(getTimestamp(list, EVENT_KEY2), now);
 
         // nor will it delete
-        usersApi.deleteActivityEventForSelf(STUDY_ID_1, EVENT_KEY2).execute();
+        usersApi.deleteStudyActivityEvent(STUDY_ID_1, EVENT_KEY2).execute();
 
-        list = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        list = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(getTimestamp(list, EVENT_KEY2), now);
+        
+        // nor will it accumulate in history
+        StudyActivityEventPagedList page = usersApi.getStudyActivityEventHistory(
+                STUDY_ID_1, EVENT_KEY2, null, null).execute().body();
+        assertEquals(1, page.getItems().size());
+        assertEquals(Integer.valueOf(1), page.getTotal());
     }
     
     @Test
@@ -479,29 +512,37 @@ public class ActivityEventTest {
         DateTime pastTime = DateTime.now(DateTimeZone.UTC).minusHours(2);
         DateTime futureTime = DateTime.now(DateTimeZone.UTC).plusHours(2);
 
-        CustomActivityEventRequest req3 = new CustomActivityEventRequest().eventId(EVENT_KEY3).timestamp(now);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req3).execute();
+        StudyActivityEventRequest req3 = new StudyActivityEventRequest().eventId(EVENT_KEY3).timestamp(now);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req3).execute();
         
-        ActivityEventList list3 = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        StudyActivityEventList list3 = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(now, getTimestamp(list3, EVENT_KEY3));
         
         // future will update
-        req3 = new CustomActivityEventRequest().eventId(EVENT_KEY3).timestamp(futureTime);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req3).execute();
-        list3 = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        req3 = new StudyActivityEventRequest().eventId(EVENT_KEY3).timestamp(futureTime);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req3).execute();
+        list3 = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(getTimestamp(list3, EVENT_KEY3), futureTime);
         
         // past will not update
-        req3 = new CustomActivityEventRequest().eventId(EVENT_KEY3).timestamp(pastTime);
-        usersApi.createActivityEventForSelf(STUDY_ID_1, req3).execute();
-        list3 = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        req3 = new StudyActivityEventRequest().eventId(EVENT_KEY3).timestamp(pastTime);
+        usersApi.createStudyActivityEvent(STUDY_ID_1, req3).execute();
+        list3 = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(getTimestamp(list3, EVENT_KEY3), futureTime);
 
         // This doesn't delete the timestamp
-        usersApi.deleteActivityEventForSelf(STUDY_ID_1, EVENT_KEY3).execute();
+        usersApi.deleteStudyActivityEvent(STUDY_ID_1, EVENT_KEY3).execute();
         
-        list3 = usersApi.getActivityEventsForSelf(STUDY_ID_1).execute().body();
+        list3 = usersApi.getStudyActivityEvents(STUDY_ID_1).execute().body();
         assertEquals(getTimestamp(list3, EVENT_KEY3), futureTime);
+        
+        // This will have accumulated two events
+        StudyActivityEventPagedList page = usersApi.getStudyActivityEventHistory(
+                STUDY_ID_1, EVENT_KEY3, null, null).execute().body();
+        assertEquals(2, page.getItems().size());
+        assertEquals(Integer.valueOf(2), page.getTotal());
+        assertEquals(ImmutableSet.of(now, futureTime), page.getItems().stream()
+                .map(StudyActivityEvent::getTimestamp).collect(Collectors.toSet()));
     }
     
     private DateTime getTimestamp(ActivityEventList list, String eventId) {
@@ -513,8 +554,26 @@ public class ActivityEventTest {
         return null;
     }
     
+    private DateTime getTimestamp(StudyActivityEventList list, String eventId) {
+        for (StudyActivityEvent event : list.getItems()) {
+            if (event.getEventId().equals("custom:"+eventId)) {
+                return event.getTimestamp();
+            }
+        }
+        return null;
+    }
+    
     private ActivityEvent findEventByKey(ActivityEventList list, String key) {
         for (ActivityEvent event : list.getItems()) {
+            if (event.getEventId().equals(key)) {
+                return event;
+            }
+        }
+        return null;
+    }
+    
+    private StudyActivityEvent findEventByKey(StudyActivityEventList list, String key) {
+        for (StudyActivityEvent event : list.getItems()) {
             if (event.getEventId().equals(key)) {
                 return event;
             }
