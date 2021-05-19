@@ -143,7 +143,7 @@ public class ForStudyCoordinatorsTest {
         // Just verify these all work, though there's no data
         StudyActivityEventList aeList = coordApi.getStudyParticipantStudyActivityEvents(STUDY_ID_1, userId).execute().body();
         assertTrue(aeList.getItems().stream().map(StudyActivityEvent::getEventId)
-                .collect(toSet()).containsAll(ImmutableSet.of("study_start_date", "created_on")));
+                .collect(toSet()).containsAll(ImmutableSet.of("created_on")));
         
         NotificationRegistrationList nrList = coordApi.getStudyParticipantNotificationRegistrations(STUDY_ID_1, userId).execute().body();
         assertTrue(nrList.getItems().isEmpty());
