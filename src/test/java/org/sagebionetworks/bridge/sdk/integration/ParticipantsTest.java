@@ -360,7 +360,8 @@ public class ParticipantsTest {
             assertFalse(retrieved.isEmailVerified());
             assertFalse(retrieved.isPhoneVerified());
             createdOn = retrieved.getCreatedOn();
-            
+            assertNull(retrieved.getNote());
+
             // Can also get by the Synapse ID
             retrieved = participantsApi.getParticipantById(retrieved.getId(), true).execute().body();
             assertEquals(email, retrieved.getEmail());
@@ -385,6 +386,7 @@ public class ParticipantsTest {
             newParticipant.setPhoneVerified(TRUE);
             Phone newPhone = new Phone().number("4152588569").regionCode("CA");
             newParticipant.setPhone(newPhone);
+            newParticipant.setNote("note2");
             // cannot set Synapse User ID or the account will be enabled.
             
             participantsApi.updateParticipant(id, newParticipant).execute();
@@ -412,6 +414,7 @@ public class ParticipantsTest {
             assertEquals(newAttributes.get("can_be_recontacted"), retrieved.getAttributes().get("can_be_recontacted"));
             assertEquals(UNVERIFIED, retrieved.getStatus()); // researchers cannot enable users
             assertEquals(createdOn, retrieved.getCreatedOn()); // hasn't been changed, still exists
+            assertEquals("note2", retrieved.getNote());
         } finally {
             if (id != null) {
                 admin.getClient(ForAdminsApi.class).deleteUser(id).execute();

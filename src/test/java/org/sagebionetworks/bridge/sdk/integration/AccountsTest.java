@@ -103,7 +103,8 @@ public class AccountsTest {
                 .dataGroups(ImmutableList.of("test_user", "sdk-int-1"))
                 .clientData("Test")
                 .languages(ImmutableList.of("en", "fr"))
-                .password(PASSWORD);
+                .password(PASSWORD)
+                .note("note");
         
         emailUserId = orgAdminApi.createAccount(account).execute().body().getIdentifier();
         
@@ -121,6 +122,7 @@ public class AccountsTest {
         assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
         assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
         assertEquals(orgId, retrieved.getOrgMembership());
+        assertEquals("note", retrieved.getNote());
         assertNull(retrieved.getPassword());
         
         AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
