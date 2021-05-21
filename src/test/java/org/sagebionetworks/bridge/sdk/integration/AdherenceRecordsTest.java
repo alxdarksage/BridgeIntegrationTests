@@ -31,8 +31,6 @@ import org.sagebionetworks.bridge.rest.api.AssessmentsApi;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.ForDevelopersApi;
 import org.sagebionetworks.bridge.rest.api.SchedulesV2Api;
-import org.sagebionetworks.bridge.rest.model.ActivityEvent;
-import org.sagebionetworks.bridge.rest.model.ActivityEventList;
 import org.sagebionetworks.bridge.rest.model.AdherenceRecord;
 import org.sagebionetworks.bridge.rest.model.AdherenceRecordList;
 import org.sagebionetworks.bridge.rest.model.AdherenceRecordUpdates;
@@ -41,13 +39,15 @@ import org.sagebionetworks.bridge.rest.model.App;
 import org.sagebionetworks.bridge.rest.model.Assessment;
 import org.sagebionetworks.bridge.rest.model.AssessmentInfo;
 import org.sagebionetworks.bridge.rest.model.AssessmentReference2;
-import org.sagebionetworks.bridge.rest.model.CustomActivityEventRequest;
 import org.sagebionetworks.bridge.rest.model.Schedule2;
 import org.sagebionetworks.bridge.rest.model.ScheduledAssessment;
 import org.sagebionetworks.bridge.rest.model.ScheduledSession;
 import org.sagebionetworks.bridge.rest.model.Session;
 import org.sagebionetworks.bridge.rest.model.SortOrder;
 import org.sagebionetworks.bridge.rest.model.Study;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEvent;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEventList;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEventRequest;
 import org.sagebionetworks.bridge.rest.model.TimeWindow;
 import org.sagebionetworks.bridge.rest.model.Timeline;
 import org.sagebionetworks.bridge.rest.model.VersionHolder;
@@ -370,12 +370,12 @@ public class AdherenceRecordsTest {
         usersApi.updateAdherenceRecords(STUDY_ID_1, 
                 new AdherenceRecordUpdates().records(list.getItems())).execute();
         
-        ActivityEventList activityList = usersApi.getActivityEventsForSelf(STUDY_ID_1)
+        StudyActivityEventList activityList = usersApi.getStudyActivityEvents(STUDY_ID_1)
                 .execute().body();
 
         boolean foundSessionEvent = false;
         boolean foundAssessmentEvent = false;
-        for (ActivityEvent event : activityList.getItems()) {
+        for (StudyActivityEvent event : activityList.getItems()) {
             if (event.getEventId().equals(sessKey)) {
                 foundSessionEvent = true;
                 assertEquals(event.getTimestamp(), finishedOn);
@@ -398,7 +398,7 @@ public class AdherenceRecordsTest {
         ForConsentedUsersApi usersApi = participant.getClient(ForConsentedUsersApi.class);
         
         // Create the fake enrollment timestamp
-        usersApi.createActivityEventForSelf(STUDY_ID_1, new CustomActivityEventRequest()
+        usersApi.createStudyActivityEvent(STUDY_ID_1, new StudyActivityEventRequest()
                 .eventId(FAKE_ENROLLMENT).timestamp(ENROLLMENT)).execute();
         
         timeline = usersApi.getTimelineForSelf(STUDY_ID_1, null).execute().body(); 
@@ -424,7 +424,7 @@ public class AdherenceRecordsTest {
         sessions = getScheduledSessions(timeline, session2.getGuid());
         
         // FIRST SERIES
-        usersApi.createActivityEventForSelf(STUDY_ID_1, new CustomActivityEventRequest()
+        usersApi.createStudyActivityEvent(STUDY_ID_1, new StudyActivityEventRequest()
                 .eventId(CLINIC_VISIT).timestamp(T1)).execute();
         session2Data(usersApi, sessions.get(0), T1, "T1", "D00", "05-18");
         session2Data(usersApi, sessions.get(1), T1, "T1", "D07", "05-25");
@@ -432,7 +432,7 @@ public class AdherenceRecordsTest {
         session2Data(usersApi, sessions.get(3), T1, "T1", "D21", "06-08");
 
         // SECOND SERIES
-        usersApi.createActivityEventForSelf(STUDY_ID_1, new CustomActivityEventRequest()
+        usersApi.createStudyActivityEvent(STUDY_ID_1, new StudyActivityEventRequest()
                 .eventId(CLINIC_VISIT).timestamp(T2)).execute();
         session2Data(usersApi, sessions.get(0), T2, "T2", "D00", "09-03");
         session2Data(usersApi, sessions.get(1), T2, "T2", "D07", "09-10");

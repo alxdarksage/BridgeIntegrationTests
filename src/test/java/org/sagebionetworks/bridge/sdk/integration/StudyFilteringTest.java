@@ -161,7 +161,7 @@ public class StudyFilteringTest {
         // This should apply to any call involving user in another study, try one (fully tested in 
         // the unit tests)
         try {
-            coordinatorsApiFor2.getStudyParticipantActivityEvents(STUDY_ID_1, user1.getId()).execute();
+            coordinatorsApiFor2.getStudyParticipantStudyActivityEvents(STUDY_ID_1, user1.getId()).execute();
             fail("Should have thrown exception");
         } catch(EntityNotFoundException e) {
         }

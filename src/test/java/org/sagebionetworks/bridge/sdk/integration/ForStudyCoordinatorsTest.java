@@ -34,8 +34,6 @@ import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.exceptions.UnauthorizedException;
 import org.sagebionetworks.bridge.rest.model.AccountSummaryList;
 import org.sagebionetworks.bridge.rest.model.AccountSummarySearch;
-import org.sagebionetworks.bridge.rest.model.ActivityEvent;
-import org.sagebionetworks.bridge.rest.model.ActivityEventList;
 import org.sagebionetworks.bridge.rest.model.ConsentSignature;
 import org.sagebionetworks.bridge.rest.model.Enrollment;
 import org.sagebionetworks.bridge.rest.model.EnrollmentDetail;
@@ -47,6 +45,8 @@ import org.sagebionetworks.bridge.rest.model.NotificationRegistrationList;
 import org.sagebionetworks.bridge.rest.model.RequestInfo;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEvent;
+import org.sagebionetworks.bridge.rest.model.StudyActivityEventList;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.SubpopulationList;
 import org.sagebionetworks.bridge.rest.model.UploadList;
@@ -141,9 +141,9 @@ public class ForStudyCoordinatorsTest {
                 .anyMatch(en -> en.getParticipant().getIdentifier().equals(userId)));
         
         // Just verify these all work, though there's no data
-        ActivityEventList aeList = coordApi.getStudyParticipantActivityEvents(STUDY_ID_1, userId).execute().body();
-        assertTrue(aeList.getItems().stream().map(ActivityEvent::getEventId)
-                .collect(toSet()).containsAll(ImmutableSet.of("study_start_date", "created_on")));
+        StudyActivityEventList aeList = coordApi.getStudyParticipantStudyActivityEvents(STUDY_ID_1, userId).execute().body();
+        assertTrue(aeList.getItems().stream().map(StudyActivityEvent::getEventId)
+                .collect(toSet()).containsAll(ImmutableSet.of("created_on")));
         
         NotificationRegistrationList nrList = coordApi.getStudyParticipantNotificationRegistrations(STUDY_ID_1, userId).execute().body();
         assertTrue(nrList.getItems().isEmpty());
