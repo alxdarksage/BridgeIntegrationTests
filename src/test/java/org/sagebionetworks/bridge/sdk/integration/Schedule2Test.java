@@ -500,5 +500,20 @@ public class Schedule2Test {
         TimeWindow window = session.getTimeWindows().get(0);
         assertEquals("08:00", window.getStartTime());
         assertEquals("P3D", window.getExpiration());
+        
+        Notification notification = session.getNotifications().get(0);
+        assertEquals(AFTER_WINDOW_START, notification.getNotifyAt());
+        assertEquals("PT10M", notification.getOffset());
+        assertTrue(notification.isAllowSnooze());
+        
+        NotificationMessage msg1 = notification.getMessages().get(0);
+        assertEquals("en", msg1.getLang());
+        assertEquals("subject", msg1.getSubject());
+        assertEquals("body", msg1.getMessage());
+        
+        NotificationMessage msg2 = notification.getMessages().get(1);
+        assertEquals("fr", msg2.getLang());
+        assertEquals("subject in French", msg2.getSubject());
+        assertEquals("body in French", msg2.getMessage());
     }
 }
