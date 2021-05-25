@@ -210,6 +210,9 @@ public class Schedule2Test {
         assertEquals("ja", schedule.getSessions().get(0).getLabels().get(1).getLang());
         assertEquals("評価を受ける", schedule.getSessions().get(0).getLabels().get(1).getValue());
         
+        String timeWindowGuid = schedule.getSessions().get(0).getTimeWindows().get(0).getGuid();
+        assertNotNull(timeWindowGuid);
+        
         // You can retrieve the timeline for this schedule
         Timeline timeline = schedulesApi.getTimelineForSchedule(schedule.getGuid()).execute().body();
         assertEquals(schedule.getDuration(), timeline.getDuration());
@@ -227,6 +230,8 @@ public class Schedule2Test {
         assertEquals("#111111", assessmentInfo.getColorScheme().getBackground());
         assertEquals("#333333", assessmentInfo.getColorScheme().getActivated());
         assertEquals("#444444", assessmentInfo.getColorScheme().getInactivated());
+        String url = "/v1/assessments/" + assessmentInfo.getGuid() + "/config";
+        assertTrue(assessmentInfo.getConfigUrl().contains(url));
         assertEquals(schedule.getSessions().get(0).getAssessments().get(0).getIdentifier(), assessmentInfo.getIdentifier());
         
         SessionInfo sessionInfo = timeline.getSessions().get(0);
@@ -234,6 +239,8 @@ public class Schedule2Test {
         assertEquals("Take the assessment", sessionInfo.getLabel());
         assertEquals("enrollment", sessionInfo.getStartEventId());
         assertEquals(PerformanceOrder.SEQUENTIAL, sessionInfo.getPerformanceOrder());
+        assertEquals(1, sessionInfo.getTimeWindowGuids().size());
+        assertEquals(timeWindowGuid, sessionInfo.getTimeWindowGuids().get(0));
         assertEquals(Integer.valueOf(10), sessionInfo.getMinutesToComplete());
         
         NotificationInfo notificationInfo = timeline.getSessions().get(0).getNotifications().get(0);
@@ -252,6 +259,9 @@ public class Schedule2Test {
         int scheduledAssessmentCount = 0;
         
         for (ScheduledSession scheduledSession : timeline.getSchedule()) {
+            
+            assertEquals(timeWindowGuid, scheduledSession.getTimeWindowGuid());
+            
             scheduledSessionCount++;
             sessionInstanceGuids.add(scheduledSession.getInstanceGuid());
             for (ScheduledAssessment schAssessment : scheduledSession.getAssessments()) {
