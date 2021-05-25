@@ -104,7 +104,7 @@ public class AccountsTest {
                 .clientData("Test")
                 .languages(ImmutableList.of("en", "fr"))
                 .password(PASSWORD)
-                .note("note");
+                .note("test note 1");
         
         emailUserId = orgAdminApi.createAccount(account).execute().body().getIdentifier();
         
@@ -122,7 +122,7 @@ public class AccountsTest {
         assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
         assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
         assertEquals(orgId, retrieved.getOrgMembership());
-        assertEquals("note", retrieved.getNote());
+        assertEquals("test note 1", retrieved.getNote());
         assertNull(retrieved.getPassword());
         
         AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
@@ -131,10 +131,12 @@ public class AccountsTest {
         
         // update the account
         retrieved.setFirstName("Alternate first name");
+        retrieved.setNote("test note 2");
         orgAdminApi.updateAccount(emailUserId, retrieved).execute();
         
         Account retrieved2 = orgAdminApi.getAccount(emailUserId).execute().body();
         assertEquals("Alternate first name", retrieved2.getFirstName());
+        assertEquals("test note 2", retrieved2.getNote());
         
         // request info. There's not a lot in it since the user cannot sign in (not verified).
         RequestInfo info = orgAdminApi.getAccountRequestInfo(emailUserId).execute().body();
