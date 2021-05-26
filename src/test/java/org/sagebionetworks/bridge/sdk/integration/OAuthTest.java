@@ -152,8 +152,8 @@ public class OAuthTest {
         String sessionToken = getValue(response, "sessionToken");
 
         // Consent to return OAuth authorization token
-        payload = escapeJSON("{'clientId':'100020','scope':'openid','claims':{'id_token':{'userid':null}},"+
-                "'responseType':'code','redirectUri':'https://research-staging.sagebridge.org'}");
+        payload = escapeJSON("{'clientId':'100018','scope':'openid','claims':{'id_token':{'userid':null}},"+
+                "'responseType':'code','redirectUri':'https://research.sagebridge.org'}");
         response = Request.Post(SYNAPSE_OAUTH_CONSENT)
                 .setHeader("content-type", "application/json")
                 .setHeader("sessiontoken", sessionToken)
@@ -166,7 +166,7 @@ public class OAuthTest {
                 .appId(TEST_APP_ID)
                 .vendorId("synapse")
                 .authToken(authToken)
-                .callbackUrl("https://research-staging.sagebridge.org");
+                .callbackUrl("https://research.sagebridge.org");
         
         AuthenticationApi authApi = worker.getClient(AuthenticationApi.class);
         UserSessionInfo session = authApi.signInWithOauthToken(token).execute().body();
