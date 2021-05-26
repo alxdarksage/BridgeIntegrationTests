@@ -155,7 +155,6 @@ public class ParticipantDataTest {
 
     @Test
     public void correctExceptionsOnBadRequest() throws Exception {
-        user = TestUserHelper.createAndSignInUser(ParticipantDataTest.class, true);
         ForConsentedUsersApi usersApi = user.getClient(ForConsentedUsersApi.class);
         try {
             usersApi.getAllDataForSelf(OFFSET_KEY, 4).execute();
