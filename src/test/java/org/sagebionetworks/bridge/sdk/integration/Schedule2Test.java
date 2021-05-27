@@ -7,9 +7,8 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
-import static org.sagebionetworks.bridge.rest.model.NotificationType.START_OF_WINDOW;
+import static org.sagebionetworks.bridge.rest.model.NotificationType.AFTER_WINDOW_START;
 import static org.sagebionetworks.bridge.rest.model.PerformanceOrder.SEQUENTIAL;
-import static org.sagebionetworks.bridge.rest.model.ReminderType.BEFORE_WINDOW_END;
 import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
 import static org.sagebionetworks.bridge.rest.model.Role.STUDY_COORDINATOR;
 import static org.sagebionetworks.bridge.rest.model.Role.STUDY_DESIGNER;
@@ -42,10 +41,10 @@ import org.sagebionetworks.bridge.rest.model.AssessmentInfo;
 import org.sagebionetworks.bridge.rest.model.AssessmentReference2;
 import org.sagebionetworks.bridge.rest.model.ColorScheme;
 import org.sagebionetworks.bridge.rest.model.Label;
+import org.sagebionetworks.bridge.rest.model.Notification;
+import org.sagebionetworks.bridge.rest.model.NotificationInfo;
 import org.sagebionetworks.bridge.rest.model.NotificationMessage;
-import org.sagebionetworks.bridge.rest.model.NotificationType;
 import org.sagebionetworks.bridge.rest.model.PerformanceOrder;
-import org.sagebionetworks.bridge.rest.model.ReminderType;
 import org.sagebionetworks.bridge.rest.model.Schedule2;
 import org.sagebionetworks.bridge.rest.model.Schedule2List;
 import org.sagebionetworks.bridge.rest.model.ScheduledAssessment;
@@ -160,10 +159,6 @@ public class Schedule2Test {
         session.setDelay("P1W");
         session.setInterval("P4W");
         session.setPerformanceOrder(SEQUENTIAL);
-        session.setNotifyAt(START_OF_WINDOW);
-        session.setRemindAt(BEFORE_WINDOW_END);
-        session.setReminderPeriod("P1D");
-        session.setAllowSnooze(true);
         
         ColorScheme colorScheme = new ColorScheme()
                 .background("#111111")
@@ -182,13 +177,19 @@ public class Schedule2Test {
                 .identifier(assessment.getIdentifier());
         session.addAssessmentsItem(ref);
         session.addTimeWindowsItem(new TimeWindow().startTime("08:00").expiration("P3D"));
-
-        NotificationMessage msgEn = new NotificationMessage().lang("en").subject("Subject")
-                .message("Time to take the assessment");
-        NotificationMessage msgFr = new NotificationMessage().lang("fr").subject("Sujet")
-                .message("Il est temps de passer l'évaluation");
-        session.addMessagesItem(msgEn);
-        session.addMessagesItem(msgFr);
+        Notification enNotification = new Notification()
+                .notifyAt(AFTER_WINDOW_START)
+                .offset("PT10M")
+                .allowSnooze(true)
+                .addMessagesItem(new NotificationMessage()
+                        .lang("en")
+                        .subject("subject")
+                        .message("body"))
+                .addMessagesItem(new NotificationMessage()
+                        .lang("fr")
+                        .subject("subject in French")
+                        .message("body in French"));
+        session.addNotificationsItem(enNotification);
         
         schedule.addSessionsItem(session);
 
@@ -240,13 +241,15 @@ public class Schedule2Test {
         assertEquals(PerformanceOrder.SEQUENTIAL, sessionInfo.getPerformanceOrder());
         assertEquals(1, sessionInfo.getTimeWindowGuids().size());
         assertEquals(timeWindowGuid, sessionInfo.getTimeWindowGuids().get(0));
-        assertEquals(NotificationType.START_OF_WINDOW, sessionInfo.getNotifyAt());
-        assertEquals(ReminderType.BEFORE_WINDOW_END, sessionInfo.getRemindAt());
-        assertTrue(sessionInfo.isAllowSnooze());
         assertEquals(Integer.valueOf(10), sessionInfo.getMinutesToComplete());
-        assertEquals("en", sessionInfo.getMessage().getLang());
-        assertEquals("Subject", sessionInfo.getMessage().getSubject());
-        assertEquals("Time to take the assessment", sessionInfo.getMessage().getMessage());
+        
+        NotificationInfo notificationInfo = timeline.getSessions().get(0).getNotifications().get(0);
+        assertEquals(AFTER_WINDOW_START, notificationInfo.getNotifyAt());
+        assertEquals("PT10M", notificationInfo.getOffset());
+        assertTrue(notificationInfo.isAllowSnooze());
+        assertEquals(notificationInfo.getMessage().getLang(), "en");
+        assertEquals(notificationInfo.getMessage().getSubject(), "subject");
+        assertEquals(notificationInfo.getMessage().getMessage(), "body");
         
         // the references in the timeline work...
         Set<String> sessionInstanceGuids = new HashSet<>();
@@ -488,10 +491,6 @@ public class Schedule2Test {
         assertEquals(SEQUENTIAL, session.getPerformanceOrder());
         assertEquals("P1W", session.getDelay());
         assertEquals("P4W", session.getInterval());
-        assertEquals(START_OF_WINDOW, session.getNotifyAt());
-        assertEquals(BEFORE_WINDOW_END, session.getRemindAt());
-        assertEquals("P1D", session.getReminderPeriod());
-        assertTrue(session.isAllowSnooze());
         
         assertEquals(1, session.getAssessments().size());
         AssessmentReference2 ref = session.getAssessments().get(0);
@@ -512,14 +511,19 @@ public class Schedule2Test {
         assertEquals("08:00", window.getStartTime());
         assertEquals("P3D", window.getExpiration());
         
-        NotificationMessage msgEn = session.getMessages().get(0);
-        assertEquals("en", msgEn.getLang());
-        assertEquals("Subject", msgEn.getSubject());
-        assertEquals("Time to take the assessment", msgEn.getMessage());
+        Notification notification = session.getNotifications().get(0);
+        assertEquals(AFTER_WINDOW_START, notification.getNotifyAt());
+        assertEquals("PT10M", notification.getOffset());
+        assertTrue(notification.isAllowSnooze());
         
-        NotificationMessage msgFr = session.getMessages().get(1);
-        assertEquals("fr", msgFr.getLang());
-        assertEquals("Sujet", msgFr.getSubject());
-        assertEquals("Il est temps de passer l'évaluation", msgFr.getMessage());
+        NotificationMessage msg1 = notification.getMessages().get(0);
+        assertEquals("en", msg1.getLang());
+        assertEquals("subject", msg1.getSubject());
+        assertEquals("body", msg1.getMessage());
+        
+        NotificationMessage msg2 = notification.getMessages().get(1);
+        assertEquals("fr", msg2.getLang());
+        assertEquals("subject in French", msg2.getSubject());
+        assertEquals("body in French", msg2.getMessage());
     }
 }
