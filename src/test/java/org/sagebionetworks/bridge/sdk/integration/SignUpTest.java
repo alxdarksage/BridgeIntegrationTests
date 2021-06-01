@@ -10,20 +10,15 @@ import org.sagebionetworks.bridge.rest.api.StudiesApi;
 import org.sagebionetworks.bridge.rest.exceptions.BadRequestException;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.exceptions.InvalidEntityException;
-import org.sagebionetworks.bridge.rest.model.App;
-import org.sagebionetworks.bridge.rest.model.Organization;
-import org.sagebionetworks.bridge.rest.model.SharingScope;
-import org.sagebionetworks.bridge.rest.model.SignIn;
-import org.sagebionetworks.bridge.rest.model.SignUp;
-import org.sagebionetworks.bridge.rest.model.Study;
-import org.sagebionetworks.bridge.rest.model.StudyParticipant;
-import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
+import org.sagebionetworks.bridge.rest.model.*;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -155,7 +150,14 @@ public class SignUpTest {
             assertEquals(participant.getExternalIds().size(), 1);
             Map.Entry<String, String> reg = Iterables.getFirst(participant.getExternalIds().entrySet(), null);
             assertEquals(extId, reg.getValue());
-            assertTrue(ImmutableSet.of(STUDY_ID_1, STUDY_ID_2).contains(reg.getKey()));
+
+            // Retrieving all Studies related to the API app.
+            StudyList testApiStudies = adminsApi.getStudies(0, 50, false).execute().body();
+            Set<String> possibleStudyIds = testApiStudies.getItems().stream()
+                    .map(Study::getIdentifier)
+                    .collect(Collectors.toSet());
+
+            assertTrue(possibleStudyIds.contains(reg.getKey()));
         } finally {
             if (participant != null) {
                 adminsApi.deleteUser(participant.getId()).execute();  
