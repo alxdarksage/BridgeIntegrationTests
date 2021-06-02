@@ -15,7 +15,9 @@ import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -27,6 +29,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.sagebionetworks.bridge.rest.RestUtils;
 import org.sagebionetworks.bridge.rest.api.AssessmentsApi;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.ForDevelopersApi;
@@ -386,6 +389,30 @@ public class AdherenceRecordsTest {
             }
         }
         assertTrue(foundSessionEvent && foundAssessmentEvent);
+        
+        // Test optional fields
+        instanceGuids = getInstanceGuidsByTag(false, "S1D02W1");
+        list = usersApi.searchForAdherenceRecords(STUDY_ID_1, new AdherenceRecordsSearch()
+                .instanceGuids(instanceGuids)).execute().body();
+        AdherenceRecord record = list.getItems().get(0);
+        record.setDeclined(true);
+        record.setClientTimeZone("America/Los_Angeles");
+        
+        Map<String,String> map = new HashMap<>();
+        map.put("A", "B");
+        record.setClientData(map);
+        
+        usersApi.updateAdherenceRecords(STUDY_ID_1, new AdherenceRecordUpdates()
+                .addRecordsItem(record)).execute();
+        list = usersApi.searchForAdherenceRecords(STUDY_ID_1, new AdherenceRecordsSearch()
+                .instanceGuids(instanceGuids)).execute().body();
+        record = list.getItems().get(0);
+        
+        assertTrue(record.isDeclined());
+        assertEquals("America/Los_Angeles", record.getClientTimeZone());
+        @SuppressWarnings("unchecked")
+        Map<String,String> retValue = (Map<String,String>)RestUtils.toType(record.getClientData(), Map.class); 
+        assertEquals("B", retValue.get("A"));
     }
     
     private AssessmentReference2 asmtToReference(Assessment asmt) {
