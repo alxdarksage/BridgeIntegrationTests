@@ -148,10 +148,10 @@ public class StudyTest {
         
         assertEquals("IRB Name", retrieved.getIrbName());
         assertEquals("IRB Protocol Name", retrieved.getIrbProtocolName());
-        assertEquals(retrieved.getIrbProtocolId(), "123");
-        assertEquals(retrieved.getIrbDecisionType(), EXEMPT);
-        assertEquals(retrieved.getIrbDecisionOn(), LocalDate.parse("2012-12-12"));
-        assertEquals(retrieved.getIrbExpiresOn(), LocalDate.parse("2013-12-12"));
+        assertEquals("123", retrieved.getIrbProtocolId());
+        assertEquals(EXEMPT, retrieved.getIrbDecisionType());
+        assertEquals(LocalDate.parse("2012-12-12"), retrieved.getIrbDecisionOn());
+        assertEquals(LocalDate.parse("2013-12-12"), retrieved.getIrbExpiresOn());
         
         Contact retrievedContact1 = retrieved.getContacts().get(0);
         assertEquals(PRINCIPAL_INVESTIGATOR, retrievedContact1.getRole());
