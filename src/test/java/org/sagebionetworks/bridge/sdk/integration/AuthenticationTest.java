@@ -191,7 +191,7 @@ public class AuthenticationTest {
     @Test
     public void requestingResetPasswordForUnknownPhoneDoesNotThrowException() throws Exception {
         SignIn email = new SignIn().appId(testUser.getAppId())
-                .phone(new Phone().number("4082588569").regionCode("CA"));
+                .phone(new Phone().number("4082588569").regionCode("US"));
         
         Response<Message> response = authApi.requestResetPassword(email).execute();
         assertEquals(202, response.code());
@@ -213,7 +213,7 @@ public class AuthenticationTest {
     @Test
     public void resendingPhoneVerificationToUnknownPhoneDoesNotThrowException() throws Exception {
         Identifier identifier = new Identifier().appId(testUser.getAppId())
-                .phone(new Phone().number("4082588569").regionCode("CA"));
+                .phone(new Phone().number("4082588569").regionCode("US"));
         
         Response<Message> response = authApi.resendPhoneVerification(identifier).execute();
         assertEquals(202, response.code());
