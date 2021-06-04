@@ -22,23 +22,9 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.sagebionetworks.bridge.rest.RestUtils;
-import org.sagebionetworks.bridge.rest.api.AccountsApi;
-import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
-import org.sagebionetworks.bridge.rest.api.ForOrgAdminsApi;
-import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
-import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
+import org.sagebionetworks.bridge.rest.api.*;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
-import org.sagebionetworks.bridge.rest.model.Account;
-import org.sagebionetworks.bridge.rest.model.AccountSummaryList;
-import org.sagebionetworks.bridge.rest.model.AccountSummarySearch;
-import org.sagebionetworks.bridge.rest.model.App;
-import org.sagebionetworks.bridge.rest.model.IdentifierUpdate;
-import org.sagebionetworks.bridge.rest.model.Phone;
-import org.sagebionetworks.bridge.rest.model.RequestInfo;
-import org.sagebionetworks.bridge.rest.model.SignIn;
-import org.sagebionetworks.bridge.rest.model.SignUp;
-import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
-import org.sagebionetworks.bridge.rest.model.VersionHolder;
+import org.sagebionetworks.bridge.rest.model.*;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
@@ -48,18 +34,24 @@ public class AccountsTest {
     private TestUser admin;
     private TestUser developer;
     private TestUser orgAdmin;
+    private TestUser consentedUser;
     private String orgId;
     private String phoneUserId;
     private String emailUserId;
     private ForOrgAdminsApi orgAdminApi;
+    private ForConsentedUsersApi consentedUsersApi;
+    private AccountsApi accountsApi;
 
     @Before
     public void before() throws Exception {
         admin = TestUserHelper.getSignedInAdmin();
         developer = TestUserHelper.createAndSignInUser(AccountsTest.class, false, DEVELOPER);
         orgAdmin = TestUserHelper.createAndSignInUser(AccountsTest.class, true, ORG_ADMIN);
+        consentedUser = TestUserHelper.createAndSignInUser(AccountsTest.class, true);
         orgAdminApi = orgAdmin.getClient(ForOrgAdminsApi.class);
         orgId = orgAdmin.getSession().getOrgMembership();
+        consentedUsersApi = consentedUser.getClient(ForConsentedUsersApi.class);
+        accountsApi = consentedUser.getClient(AccountsApi.class);
         
         IntegTestUtils.deletePhoneUser();
 
@@ -122,7 +114,7 @@ public class AccountsTest {
         assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
         assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
         assertEquals(orgId, retrieved.getOrgMembership());
-        assertEquals("test note 1", retrieved.getNote());
+        assertNull(retrieved.getNote());
         assertNull(retrieved.getPassword());
         
         AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
@@ -219,5 +211,57 @@ public class AccountsTest {
         identifierUpdate.phoneUpdate(new Phone().number("4082588569").regionCode("US"));
         info = accountsApi.updateIdentifiersForSelf(identifierUpdate).execute().body();
         assertEquals(PHONE.getNumber(), info.getPhone().getNumber()); // unchanged
+    }
+
+    @Test
+    public void noteUpdateFailsSilentlyForNonAdmin() throws Exception {
+        String email = IntegTestUtils.makeEmail(AccountsTest.class);
+        Account account = new Account()
+                .firstName("firstName")
+                .lastName("lastName")
+                .synapseUserId(SYNAPSE_USER_ID)
+                .email(email)
+                .phone(PHONE)
+                .attributes(ImmutableMap.of("can_be_recontacted", "true"))
+                .roles(ImmutableList.of(STUDY_COORDINATOR))
+                .dataGroups(ImmutableList.of("test_user", "sdk-int-1"))
+                .clientData("Test")
+                .languages(ImmutableList.of("en", "fr"))
+                .password(PASSWORD)
+                .note("test note 1");
+
+        emailUserId = orgAdminApi.createAccount(account).execute().body().getIdentifier();
+
+        Account retrieved = orgAdminApi.getAccount(emailUserId).execute().body();
+        assertEquals("firstName", retrieved.getFirstName());
+        assertEquals("lastName", retrieved.getLastName());
+        assertEquals(SYNAPSE_USER_ID, retrieved.getSynapseUserId());
+        assertEquals(email, retrieved.getEmail());
+        assertEquals(PHONE.getNumber(), retrieved.getPhone().getNumber());
+        assertEquals(PHONE.getRegionCode(), retrieved.getPhone().getRegionCode());
+        assertEquals("true", retrieved.getAttributes().get("can_be_recontacted"));
+        assertEquals(ENABLED, retrieved.getStatus());
+        assertEquals(ImmutableList.of(STUDY_COORDINATOR), retrieved.getRoles());
+        assertEquals(USER_DATA_GROUPS, retrieved.getDataGroups());
+        assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
+        assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
+        assertEquals(orgId, retrieved.getOrgMembership());
+        assertNull(retrieved.getNote());
+        assertNull(retrieved.getPassword());
+
+        AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
+        AccountSummaryList list = orgAdmin.getClient(OrganizationsApi.class).getMembers(orgId, search).execute().body();
+        assertEquals(emailUserId, list.getItems().get(0).getId());
+
+
+//        Account basic = accountsApi.getAccount(emailUserId).execute().body();
+//        assertEquals("firstName", basic.getFirstName());
+
+        ParticipantData participantData = consentedUsersApi.getDataByIdentifierForSelf(retrieved.getId()).execute().body();
+        System.out.println(participantData.toString());
+
+        consentedUsersApi.get
+//        Account basic = consentedUsersApi.getAllDataForSelf("0", 50).execute().body();
+
     }
 }
