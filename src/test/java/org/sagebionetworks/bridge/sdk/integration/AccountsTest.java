@@ -5,9 +5,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.AccountStatus.ENABLED;
-import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
-import static org.sagebionetworks.bridge.rest.model.Role.ORG_ADMIN;
-import static org.sagebionetworks.bridge.rest.model.Role.STUDY_COORDINATOR;
+import static org.sagebionetworks.bridge.rest.model.Role.*;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.PASSWORD;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.PHONE;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.SYNAPSE_USER_ID;
@@ -78,6 +76,9 @@ public class AccountsTest {
         }
         if (emailUserId != null) {
             admin.getClient(ForAdminsApi.class).deleteUser(emailUserId).execute();
+        }
+        if (consentedUser != null) {
+            consentedUser.signOutAndDeleteUser();
         }
     }
     
@@ -223,12 +224,13 @@ public class AccountsTest {
                 .email(email)
                 .phone(PHONE)
                 .attributes(ImmutableMap.of("can_be_recontacted", "true"))
-                .roles(ImmutableList.of(STUDY_COORDINATOR))
+//                .roles(ImmutableList.of())
                 .dataGroups(ImmutableList.of("test_user", "sdk-int-1"))
                 .clientData("Test")
                 .languages(ImmutableList.of("en", "fr"))
                 .password(PASSWORD)
-                .note("test note 1");
+                .note("test note 1")
+                .emailVerified(true);
 
         emailUserId = orgAdminApi.createAccount(account).execute().body().getIdentifier();
 
@@ -241,27 +243,180 @@ public class AccountsTest {
         assertEquals(PHONE.getRegionCode(), retrieved.getPhone().getRegionCode());
         assertEquals("true", retrieved.getAttributes().get("can_be_recontacted"));
         assertEquals(ENABLED, retrieved.getStatus());
-        assertEquals(ImmutableList.of(STUDY_COORDINATOR), retrieved.getRoles());
+//        assertEquals(ImmutableList.of(STUDY_COORDINATOR), retrieved.getRoles());
         assertEquals(USER_DATA_GROUPS, retrieved.getDataGroups());
         assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
         assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
         assertEquals(orgId, retrieved.getOrgMembership());
         assertNull(retrieved.getNote());
         assertNull(retrieved.getPassword());
+//        org.junit.Assert.assertTrue(retrieved.isEmailVerified());
 
         AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
         AccountSummaryList list = orgAdmin.getClient(OrganizationsApi.class).getMembers(orgId, search).execute().body();
         assertEquals(emailUserId, list.getItems().get(0).getId());
 
 
+
+        // update the account
+        retrieved.setFirstName("Alternate first name");
+        retrieved.setNote("test note 2");
+        retrieved.emailVerified(true);
+        orgAdminApi.updateAccount(emailUserId, retrieved).execute();
+
+        Account retrieved2 = orgAdminApi.getAccount(emailUserId).execute().body();
+        assertEquals("Alternate first name", retrieved2.getFirstName());
+        assertEquals("test note 2", retrieved2.getNote());
+        System.out.println(retrieved2.isEmailVerified());
+
+
+
+
+        SignIn signIn = new SignIn().appId(TEST_APP_ID).email(retrieved.getEmail()).password(PASSWORD);
+        TestUser testUser = TestUserHelper.getSignedInUser(signIn);
+
+
+
 //        Account basic = accountsApi.getAccount(emailUserId).execute().body();
 //        assertEquals("firstName", basic.getFirstName());
 
-        ParticipantData participantData = consentedUsersApi.getDataByIdentifierForSelf(retrieved.getId()).execute().body();
-        System.out.println(participantData.toString());
+//        ParticipantData participantData = consentedUsersApi.getDataByIdentifierForSelf(retrieved.getId()).execute().body();
+//        System.out.println(participantData.toString());
 
-        consentedUsersApi.get
-//        Account basic = consentedUsersApi.getAllDataForSelf("0", 50).execute().body();
+//        StudyParticipant participant = consentedUsersApi.getUsersParticipantRecord(false).execute().body();
+//        System.out.println(participant.getFirstName());
+//        System.out.println(participant.getNote());
+//        System.out.println(participant.getId());
+//        System.out.println(participant.getEmail());
+//
+//        participant.setFirstName("test firstname");
+//        participant.setNote("test setting note");
+//        consentedUsersApi.updateUsersParticipantRecord(participant);
+//
+//        StudyParticipant p2 = consentedUsersApi.getUsersParticipantRecord(false).execute().body();
+//        System.out.println(p2.getFirstName());
+//        System.out.println(p2.getNote());
+//        System.out.println(p2.getId());
+//        System.out.println(p2.getEmail());
+//        System.out.println(p2.getExternalIds());
 
+//        Account p3 = orgAdminApi.getAccount(p2.getId()).execute().body();
+//        ForAdminsApi adminsApi = admin.getClient(ForAdminsApi.class);
+//        Account p3 = adminsApi.dele
+//        System.out.println(p3.getFirstName());
+//        System.out.println(p3.getNote());
+//        System.out.println(p3.getId());
+//        System.out.println(p3.getEmail());
+
+//        SignIn signIn = new SignIn().appId(TEST_APP_ID).email(email).password(PASSWORD);
+//        TestUser testUser = TestUserHelper.getSignedInUser(signIn);
+//
+//        StudyParticipant testParticipant = consentedUsersApi.getUsersParticipantRecord(false).execute().body();
+//        System.out.println(testParticipant.getFirstName());
+
+
+
+        // delete the account
+        orgAdminApi.deleteAccount(emailUserId).execute();
+
+        try {
+            orgAdminApi.getAccount(emailUserId).execute().body();
+            fail("Should have thrown an exception");
+        } catch(EntityNotFoundException e) {
+            assertEquals("Account not found.", e.getMessage());
+        }
+    }
+
+    @Test
+    public void noteUpdateFailsSilentlyForNonAdmin2() throws Exception {
+//        ForOrgAdminsApi orgAdminApi = orgAdmin.getClient(ForOrgAdminsApi.class);
+
+        String email = IntegTestUtils.makeEmail(AccountsTest.class);
+        SignUp signUp = new SignUp().appId(TEST_APP_ID).email(email).password(PASSWORD)
+                .consent(true)
+//                .orgMembership(SAGE_ID);
+                .orgMembership(SAGE_ID).roles(ImmutableList.of(DEVELOPER));
+
+        emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+
+        SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
+        TestUser emailUser = TestUserHelper.getSignedInUser(signIn);
+
+        IdentifierUpdate identifierUpdate = new IdentifierUpdate().signIn(signIn).phoneUpdate(PHONE);
+
+        AccountsApi accountsApi = emailUser.getClient(AccountsApi.class);
+        UserSessionInfo info = accountsApi.updateIdentifiersForSelf(identifierUpdate).execute().body();
+        assertEquals(PHONE.getNumber(), info.getPhone().getNumber());
+
+        Account retrieved = orgAdminApi.getAccount(emailUserId).execute().body();
+        assertEquals(PHONE.getNumber(), retrieved.getPhone().getNumber());
+
+        // But if you do it again (even using a new number), it should not work
+        identifierUpdate.phoneUpdate(new Phone().number("4082588569").regionCode("US"));
+        info = accountsApi.updateIdentifiersForSelf(identifierUpdate).execute().body();
+        assertEquals(PHONE.getNumber(), info.getPhone().getNumber()); // unchanged
+
+        System.out.println("retrieved firstname " + retrieved.getFirstName());
+        retrieved.setFirstName("new firstname");
+        System.out.println(retrieved.getFirstName());
+        System.out.println("retrieved roles " + retrieved.getRoles());
+//        retrieved.addRolesItem(ADMIN);
+        System.out.println(retrieved.getRoles());
+        retrieved.setNote("setting a test note");
+        orgAdminApi.updateAccount(emailUserId, retrieved).execute();
+
+        ForConsentedUsersApi emailUserApi = emailUser.getClient(ForConsentedUsersApi.class);
+        StudyParticipant participant = emailUserApi.getUsersParticipantRecord(false).execute().body();
+        System.out.println(participant.getId());
+        System.out.println(participant.getFirstName());
+        System.out.println(participant.getNote());
+        System.out.println(participant.getRoles());
+
+        participant.setFirstName("maybe this first name");
+        participant.setNote("maybe a note?");
+        emailUserApi.updateUsersParticipantRecord(participant).execute();
+
+        Account updatedRetrieved = orgAdminApi.getAccount(emailUserId).execute().body();
+        System.out.println(updatedRetrieved.getId());
+        System.out.println(updatedRetrieved.getNote());
+        System.out.println(updatedRetrieved.getFirstName());
+        System.out.println(updatedRetrieved.getRoles());
+
+
+//        Account emailUserAccount = accountsApi.getAccount(emailUserId).execute().body();
+//        System.out.println(emailUserAccount.getId());
+//        System.out.println(emailUserAccount.getEmail());
+//        System.out.println(emailUserAccount.getNote());
+
+    }
+
+    @Test
+    public void noteUpdateFailsSilentlyForNonAdmin3() throws Exception {
+        String email = IntegTestUtils.makeEmail(AccountsTest.class);
+        SignUp signUp = new SignUp().appId(TEST_APP_ID).email(email).password(PASSWORD)
+                .consent(true)
+                .firstName("original name")
+//                .orgMembership(SAGE_ID);
+                .orgMembership(SAGE_ID).roles(ImmutableList.of(ADMIN));
+
+        String testUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+
+        SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
+        TestUser testUser = TestUserHelper.getSignedInUser(signIn);
+
+        Account adminAccessTestUserAccount = orgAdminApi.getAccount(testUserId).execute().body();
+
+        System.out.println("Initial account orgAdminApi retrieval");
+        System.out.println(adminAccessTestUserAccount.getId());
+        System.out.println(adminAccessTestUserAccount.getFirstName());
+        System.out.println(adminAccessTestUserAccount.getNote());
+        System.out.println(adminAccessTestUserAccount.getRoles());
+
+        AccountsApi testUserAccountsApi = testUser.getClient(AccountsApi.class);
+        Account nonAdminAccessTestUserAccount = testUserAccountsApi.getAccount(testUserId).execute().body();
+        System.out.println(nonAdminAccessTestUserAccount.getId());
+        System.out.println(nonAdminAccessTestUserAccount.getFirstName());
+        System.out.println(nonAdminAccessTestUserAccount.getNote());
+        System.out.println(nonAdminAccessTestUserAccount.getRoles());
     }
 }
