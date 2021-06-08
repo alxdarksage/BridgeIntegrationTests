@@ -18,15 +18,17 @@ import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
+import org.sagebionetworks.bridge.rest.model.StudyList;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
 
 import java.io.IOException;
 import java.util.Map;
+import java.util.Set;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
-import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.Iterables;
 
 import static org.junit.Assert.assertEquals;
@@ -36,8 +38,6 @@ import static org.sagebionetworks.bridge.rest.model.SharingScope.NO_SHARING;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.API_SIGNIN;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.PASSWORD;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.SHARED_SIGNIN;
-import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_1;
-import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_2;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.SAGE_ID;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.SHARED_APP_ID;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
@@ -155,7 +155,14 @@ public class SignUpTest {
             assertEquals(participant.getExternalIds().size(), 1);
             Map.Entry<String, String> reg = Iterables.getFirst(participant.getExternalIds().entrySet(), null);
             assertEquals(extId, reg.getValue());
-            assertTrue(ImmutableSet.of(STUDY_ID_1, STUDY_ID_2).contains(reg.getKey()));
+
+            // Retrieving all Studies related to the API app.
+            StudyList testApiStudies = adminsApi.getStudies(0, 50, false).execute().body();
+            Set<String> possibleStudyIds = testApiStudies.getItems().stream()
+                    .map(Study::getIdentifier)
+                    .collect(Collectors.toSet());
+
+            assertTrue(possibleStudyIds.contains(reg.getKey()));
         } finally {
             if (participant != null) {
                 adminsApi.deleteUser(participant.getId()).execute();  
