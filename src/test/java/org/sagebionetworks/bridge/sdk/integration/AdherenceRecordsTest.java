@@ -1,7 +1,10 @@
 package org.sagebionetworks.bridge.sdk.integration;
 
 import static java.util.stream.Collectors.toList;
+import static org.joda.time.DateTimeZone.UTC;
 import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.sagebionetworks.bridge.rest.model.ActivityEventUpdateType.MUTABLE;
 import static org.sagebionetworks.bridge.rest.model.AdherenceRecordType.ASSESSMENT;
@@ -15,7 +18,11 @@ import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Optional;
+import java.util.stream.Collectors;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableSet;
@@ -27,6 +34,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.sagebionetworks.bridge.rest.RestUtils;
 import org.sagebionetworks.bridge.rest.api.AssessmentsApi;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.ForDevelopersApi;
@@ -43,6 +51,7 @@ import org.sagebionetworks.bridge.rest.model.Schedule2;
 import org.sagebionetworks.bridge.rest.model.ScheduledAssessment;
 import org.sagebionetworks.bridge.rest.model.ScheduledSession;
 import org.sagebionetworks.bridge.rest.model.Session;
+import org.sagebionetworks.bridge.rest.model.SessionInfo;
 import org.sagebionetworks.bridge.rest.model.SortOrder;
 import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyActivityEvent;
@@ -386,7 +395,133 @@ public class AdherenceRecordsTest {
             }
         }
         assertTrue(foundSessionEvent && foundAssessmentEvent);
+        
+        // Test optional fields
+        instanceGuids = getInstanceGuidsByTag(false, "S1D02W1");
+        list = usersApi.searchForAdherenceRecords(STUDY_ID_1, new AdherenceRecordsSearch()
+                .instanceGuids(instanceGuids)).execute().body();
+        AdherenceRecord record = list.getItems().get(0);
+        record.setDeclined(true);
+        record.setClientTimeZone("America/Los_Angeles");
+        
+        Map<String,String> map = new HashMap<>();
+        map.put("A", "B");
+        record.setClientData(map);
+        
+        usersApi.updateAdherenceRecords(STUDY_ID_1, new AdherenceRecordUpdates()
+                .addRecordsItem(record)).execute();
+        list = usersApi.searchForAdherenceRecords(STUDY_ID_1, new AdherenceRecordsSearch()
+                .instanceGuids(instanceGuids)).execute().body();
+        record = list.getItems().get(0);
+        
+        assertTrue(record.isDeclined());
+        assertEquals("America/Los_Angeles", record.getClientTimeZone());
+        @SuppressWarnings("unchecked")
+        Map<String,String> retValue = (Map<String,String>)RestUtils.toType(record.getClientData(), Map.class); 
+        assertEquals("B", retValue.get("A"));
     }
+    
+    @Test
+    public void testSessionStateManagement() throws Exception {
+        participant = TestUserHelper.createAndSignInUser(AdherenceRecordsTest.class, true);
+        ForConsentedUsersApi usersApi = participant.getClient(ForConsentedUsersApi.class);
+        
+        // Create the fake enrollment timestamp
+        usersApi.createStudyActivityEvent(STUDY_ID_1, new StudyActivityEventRequest()
+                .eventId(CLINIC_VISIT).timestamp(T1)).execute();
+        
+        timeline = usersApi.getTimelineForSelf(STUDY_ID_1, null).execute().body();
+        SessionInfo session2 = timeline.getSessions().get(1); // session #2
+        String sessionGuid = session2.getGuid();
+        
+        ScheduledSession schSession = timeline.getSchedule().stream()
+            .filter(schSess -> schSess.getRefGuid().equals(sessionGuid))
+            .findFirst().get();
+        
+        ScheduledAssessment asmt1 = schSession.getAssessments().get(0);
+        ScheduledAssessment asmt2 = schSession.getAssessments().get(1);
+        
+        DateTime ts0 = DateTime.now(UTC).minusHours(2);
+        DateTime ts1 = DateTime.now(UTC).minusHours(1);
+        DateTime ts2 = DateTime.now(UTC);
+        DateTime ts3 = DateTime.now(UTC).plusHours(1);
+        DateTime ts4 = DateTime.now(UTC).plusHours(2);
+        DateTime ts5 = DateTime.now(UTC).plusHours(3);
+        
+        // starting one assessments starts the session
+        updateAssessmentRecord(usersApi, asmt1.getInstanceGuid(), ts1, null);
+        
+        AdherenceRecord sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertNull(sessionRecord.getFinishedOn());
+        
+        // starting both assessments doesn't change the session
+        updateAssessmentRecord(usersApi, asmt2.getInstanceGuid(), ts3, null);
+
+        sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertNull(sessionRecord.getFinishedOn());
+        
+        // finishing one assessment doesn't change the session
+        updateAssessmentRecord(usersApi, asmt1.getInstanceGuid(), ts1, ts2);
+
+        sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertNull(sessionRecord.getFinishedOn());
+
+        // finishing both assessments finishes the session
+        updateAssessmentRecord(usersApi, asmt2.getInstanceGuid(), ts3, ts4);
+        
+        sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertEquals(ts4, sessionRecord.getFinishedOn());
+
+        // later changes do not update the session
+        updateAssessmentRecord(usersApi, asmt2.getInstanceGuid(), ts0, ts5);
+
+        sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertEquals(ts4, sessionRecord.getFinishedOn());
+        
+        // declining one assessment doesn't decline the session
+        declineAssessmentRecord(usersApi, asmt1.getInstanceGuid());
+
+        sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertFalse(sessionRecord.isDeclined());
+        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertNull(sessionRecord.getFinishedOn());
+        
+        // declining both assessments declines the session. Also wipes out the 
+        // finishedOn timestamp because the record is updated with no startedOn/finishedOn
+        declineAssessmentRecord(usersApi, asmt2.getInstanceGuid());
+
+        sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
+        assertTrue(sessionRecord.isDeclined());
+        assertNull(sessionRecord.getStartedOn());
+        assertNull(sessionRecord.getFinishedOn());
+    }
+    
+    private void updateAssessmentRecord(ForConsentedUsersApi usersApi, String instanceGuid, DateTime startedOn,
+            DateTime finishedOn) throws Exception {
+        AdherenceRecord record1 = new AdherenceRecord().instanceGuid(instanceGuid)
+                .eventTimestamp(T1)
+                .startedOn(startedOn).finishedOn(finishedOn);
+        usersApi.updateAdherenceRecords(STUDY_ID_1, new AdherenceRecordUpdates().addRecordsItem(record1)).execute();
+
+    }
+
+    private void declineAssessmentRecord(ForConsentedUsersApi usersApi, String instanceGuid) throws Exception {
+        AdherenceRecord record1 = new AdherenceRecord().instanceGuid(instanceGuid)
+                .eventTimestamp(T1).declined(true);
+        usersApi.updateAdherenceRecords(STUDY_ID_1, new AdherenceRecordUpdates().addRecordsItem(record1)).execute();
+    }
+    
+    private AdherenceRecord getSessionRecord(ForConsentedUsersApi usersApi, String instanceGuid) throws Exception {
+        return usersApi.searchForAdherenceRecords(STUDY_ID_1, 
+                new AdherenceRecordsSearch().addInstanceGuidsItem(instanceGuid))
+                .execute().body().getItems().get(0);
+    }
+
     
     private AssessmentReference2 asmtToReference(Assessment asmt) {
         return new AssessmentReference2()
