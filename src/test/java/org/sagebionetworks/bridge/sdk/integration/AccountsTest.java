@@ -5,7 +5,9 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.AccountStatus.ENABLED;
-import static org.sagebionetworks.bridge.rest.model.Role.*;
+import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
+import static org.sagebionetworks.bridge.rest.model.Role.ORG_ADMIN;
+import static org.sagebionetworks.bridge.rest.model.Role.STUDY_COORDINATOR;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.PASSWORD;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.PHONE;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.SYNAPSE_USER_ID;
@@ -20,9 +22,25 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.sagebionetworks.bridge.rest.RestUtils;
-import org.sagebionetworks.bridge.rest.api.*;
+import org.sagebionetworks.bridge.rest.api.AccountsApi;
+import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
+import org.sagebionetworks.bridge.rest.api.ForOrgAdminsApi;
+import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
+import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
+import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
-import org.sagebionetworks.bridge.rest.model.*;
+import org.sagebionetworks.bridge.rest.model.Account;
+import org.sagebionetworks.bridge.rest.model.AccountSummaryList;
+import org.sagebionetworks.bridge.rest.model.AccountSummarySearch;
+import org.sagebionetworks.bridge.rest.model.App;
+import org.sagebionetworks.bridge.rest.model.IdentifierUpdate;
+import org.sagebionetworks.bridge.rest.model.Phone;
+import org.sagebionetworks.bridge.rest.model.RequestInfo;
+import org.sagebionetworks.bridge.rest.model.SignIn;
+import org.sagebionetworks.bridge.rest.model.SignUp;
+import org.sagebionetworks.bridge.rest.model.StudyParticipant;
+import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
+import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
@@ -37,8 +55,6 @@ public class AccountsTest {
     private String phoneUserId;
     private String emailUserId;
     private ForOrgAdminsApi orgAdminApi;
-    private ForConsentedUsersApi consentedUsersApi;
-    private AccountsApi accountsApi;
 
     @Before
     public void before() throws Exception {
@@ -48,9 +64,7 @@ public class AccountsTest {
         consentedUser = TestUserHelper.createAndSignInUser(AccountsTest.class, true);
         orgAdminApi = orgAdmin.getClient(ForOrgAdminsApi.class);
         orgId = orgAdmin.getSession().getOrgMembership();
-        consentedUsersApi = consentedUser.getClient(ForConsentedUsersApi.class);
-        accountsApi = consentedUser.getClient(AccountsApi.class);
-        
+
         IntegTestUtils.deletePhoneUser();
 
         ForSuperadminsApi superadminApi = admin.getClient(ForSuperadminsApi.class);
