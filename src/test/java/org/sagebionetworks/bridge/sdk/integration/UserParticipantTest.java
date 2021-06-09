@@ -17,6 +17,7 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
+import org.sagebionetworks.bridge.rest.api.ForResearchersApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.model.Role;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
@@ -36,16 +37,21 @@ import java.util.List;
 public class UserParticipantTest {
 
     private static TestUser developer;
+    private static TestUser researcher;
 
     @BeforeClass
     public static void before() throws Exception {
         developer = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.DEVELOPER);
+        researcher = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.RESEARCHER);
     }
 
     @AfterClass
     public static void after() throws Exception {
         if (developer != null) {
             developer.signOutAndDeleteUser();    
+        }
+        if (researcher != null) {
+            researcher.signOutAndDeleteUser();;
         }
     }
 
@@ -148,4 +154,110 @@ public class UserParticipantTest {
         assertTrue(participant.getDataGroups().isEmpty());
     }
 
+    @Test
+    public void canNotUpdateRecordNote() throws Exception {
+        TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
+        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
+        try {
+            ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
+
+            StudyParticipant preUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
+                    .execute().body();
+            assertNull(preUpdateParticipant.getFirstName());
+            assertNull(preUpdateParticipant.getNote());
+
+            StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
+
+            participant.setFirstName("participant attempted firstName");
+            participant.setNote("participant attempted note");
+
+            participantsApi.updateUsersParticipantRecord(participant).execute().body();
+
+            StudyParticipant postUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
+                    .execute().body();
+            assertEquals("participant attempted firstName", postUpdateParticipant.getFirstName());
+            assertNull(postUpdateParticipant.getNote());
+        } finally {
+            user.signOutAndDeleteUser();
+        }
+    }
+
+    @Test
+    public void participantCanNotEraseExistingNote() throws Exception {
+        TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
+        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
+        try {
+            ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
+
+            StudyParticipant preUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
+                    .execute().body();
+            preUpdateParticipant.setFirstName("original firstName");
+            preUpdateParticipant.setNote("existing note");
+
+            researchersApi.updateParticipant(user.getUserId(), preUpdateParticipant).execute();
+
+            StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
+            participant.setFirstName("participant attempted firstName");
+            participant.setNote("participant attempted note");
+
+            participantsApi.updateUsersParticipantRecord(participant).execute().body();
+
+            StudyParticipant postUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
+                    .execute().body();
+            assertEquals("participant attempted firstName", postUpdateParticipant.getFirstName());
+            assertEquals("existing note", postUpdateParticipant.getNote());
+        } finally {
+            user.signOutAndDeleteUser();
+        }
+    }
+
+    @Test
+    public void canNotViewRecordNote() throws Exception {
+        TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
+        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
+        try {
+            ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
+
+            StudyParticipant preUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
+                    .execute().body();
+            preUpdateParticipant.setFirstName("participant firstName");
+            preUpdateParticipant.setNote("participant note");
+
+            researchersApi.updateParticipant(user.getUserId(), preUpdateParticipant).execute();
+
+            StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
+            assertEquals("participant firstName", participant.getFirstName());
+            assertNull(participant.getNote());
+
+            StudyParticipant verifiedParticipant = researchersApi.getParticipantById(user.getUserId(), false)
+                    .execute().body();
+            assertEquals("participant firstName", verifiedParticipant.getFirstName());
+            assertEquals("participant note", verifiedParticipant.getNote());
+        } finally {
+            user.signOutAndDeleteUser();
+        }
+    }
+
+    @Test
+    public void adminCanUpdateAndViewSelfNote() throws Exception {
+        TestUser admin = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.ADMIN);
+        ParticipantsApi adminParticipantsApi = admin.getClient(ParticipantsApi.class);
+        try {
+            StudyParticipant originalParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
+                    .execute().body();
+            assertNull(originalParticipant.getFirstName());
+            assertNull(originalParticipant.getNote());
+
+            originalParticipant.setFirstName("admin firstName");
+            originalParticipant.setNote("admin note");
+            adminParticipantsApi.updateUsersParticipantRecord(originalParticipant).execute();
+
+            StudyParticipant updatedParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
+                    .execute().body();
+            assertEquals("admin firstName", updatedParticipant.getFirstName());
+            assertEquals("admin note", updatedParticipant.getNote());
+        } finally {
+            admin.signOutAndDeleteUser();
+        }
+    }
 }
