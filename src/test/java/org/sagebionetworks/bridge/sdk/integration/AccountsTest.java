@@ -252,7 +252,7 @@ public class AccountsTest {
                 .consent(true)
                 .orgMembership(SAGE_ID);
 
-        String emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+        emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
 
         SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
         TestUser emailUser = TestUserHelper.getSignedInUser(signIn);
