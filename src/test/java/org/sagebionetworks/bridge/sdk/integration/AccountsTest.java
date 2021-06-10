@@ -50,7 +50,6 @@ public class AccountsTest {
     private TestUser admin;
     private TestUser developer;
     private TestUser orgAdmin;
-    private TestUser consentedUser;
     private String orgId;
     private String phoneUserId;
     private String emailUserId;
@@ -61,7 +60,6 @@ public class AccountsTest {
         admin = TestUserHelper.getSignedInAdmin();
         developer = TestUserHelper.createAndSignInUser(AccountsTest.class, false, DEVELOPER);
         orgAdmin = TestUserHelper.createAndSignInUser(AccountsTest.class, true, ORG_ADMIN);
-        consentedUser = TestUserHelper.createAndSignInUser(AccountsTest.class, true);
         orgAdminApi = orgAdmin.getClient(ForOrgAdminsApi.class);
         orgId = orgAdmin.getSession().getOrgMembership();
 
@@ -90,9 +88,6 @@ public class AccountsTest {
         }
         if (emailUserId != null) {
             admin.getClient(ForAdminsApi.class).deleteUser(emailUserId).execute();
-        }
-        if (consentedUser != null) {
-            consentedUser.signOutAndDeleteUser();
         }
     }
     
@@ -235,28 +230,19 @@ public class AccountsTest {
                 .consent(true)
                 .orgMembership(SAGE_ID);
 
-        String testUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+        emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
 
         SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
-        TestUser testUser = TestUserHelper.getSignedInUser(signIn);
+        TestUser emailUser = TestUserHelper.getSignedInUser(signIn);
 
-        Account adminAccessTestUserAccount = orgAdminApi.getAccount(testUserId).execute().body();
-
+        Account adminAccessTestUserAccount = orgAdminApi.getAccount(emailUserId).execute().body();
         adminAccessTestUserAccount.setNote("setting a test note");
-        orgAdminApi.updateAccount(testUserId, adminAccessTestUserAccount).execute();
+        orgAdminApi.updateAccount(emailUserId, adminAccessTestUserAccount).execute();
 
-        // Verifying the note exists on test user's account
-        adminAccessTestUserAccount = orgAdminApi.getAccount(testUserId).execute().body();
-        assertEquals(testUserId, adminAccessTestUserAccount.getId());
-        assertEquals("setting a test note", adminAccessTestUserAccount.getNote());
-
-        // Verifying that the non-Admin test user cannot see the note field
-        ForConsentedUsersApi testUserConsentedUsersApi = testUser.getClient(ForConsentedUsersApi.class);
+        // Verifying that the non-Admin user cannot see the note field
+        ForConsentedUsersApi testUserConsentedUsersApi = emailUser.getClient(ForConsentedUsersApi.class);
         StudyParticipant nonAdminAccessTestUserAccount = testUserConsentedUsersApi.getUsersParticipantRecord(false).execute().body();
-        assertEquals(testUserId, nonAdminAccessTestUserAccount.getId());
         assertNull(nonAdminAccessTestUserAccount.getNote());
-
-        orgAdminApi.deleteAccount(testUserId).execute();
     }
 
     @Test
@@ -264,38 +250,25 @@ public class AccountsTest {
         String email = IntegTestUtils.makeEmail(AccountsTest.class);
         SignUp signUp = new SignUp().appId(TEST_APP_ID).email(email).password(PASSWORD)
                 .consent(true)
-                .firstName("original firstname")
                 .orgMembership(SAGE_ID);
 
-        String testUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+        String emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
 
         SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
-        TestUser testUser = TestUserHelper.getSignedInUser(signIn);
+        TestUser emailUser = TestUserHelper.getSignedInUser(signIn);
 
-        Account adminAccessTestUserAccount = orgAdminApi.getAccount(testUserId).execute().body();
-
+        Account adminAccessTestUserAccount = orgAdminApi.getAccount(emailUserId).execute().body();
         adminAccessTestUserAccount.setNote("original test note");
-        orgAdminApi.updateAccount(testUserId, adminAccessTestUserAccount).execute();
-
-        // Verifying the note exists on test user's account
-        adminAccessTestUserAccount = orgAdminApi.getAccount(testUserId).execute().body();
-        assertEquals(testUserId, adminAccessTestUserAccount.getId());
-        assertEquals("original firstname", adminAccessTestUserAccount.getFirstName());
-        assertEquals("original test note", adminAccessTestUserAccount.getNote());
+        orgAdminApi.updateAccount(emailUserId, adminAccessTestUserAccount).execute();
 
         // Attempting to update note through non-Admin account
-        ForConsentedUsersApi testUserConsentedUsersApi = testUser.getClient(ForConsentedUsersApi.class);
+        ForConsentedUsersApi testUserConsentedUsersApi = emailUser.getClient(ForConsentedUsersApi.class);
         StudyParticipant nonAdminAccessTestUserAccount = testUserConsentedUsersApi.getUsersParticipantRecord(false).execute().body();
-        nonAdminAccessTestUserAccount.setFirstName("updated firstname");
         nonAdminAccessTestUserAccount.setNote("updated test note");
         testUserConsentedUsersApi.updateUsersParticipantRecord(nonAdminAccessTestUserAccount).execute();
 
         // Verifying that original note was retained
-        Account adminAccessUpdatedTestUserAccount = orgAdminApi.getAccount(testUserId).execute().body();
-        assertEquals(testUserId, adminAccessUpdatedTestUserAccount.getId());
-        assertEquals("updated firstname", adminAccessUpdatedTestUserAccount.getFirstName());
+        Account adminAccessUpdatedTestUserAccount = orgAdminApi.getAccount(emailUserId).execute().body();
         assertEquals("original test note", adminAccessUpdatedTestUserAccount.getNote());
-
-        orgAdminApi.deleteAccount(testUserId).execute();
     }
 }

@@ -38,11 +38,13 @@ public class UserParticipantTest {
 
     private static TestUser developer;
     private static TestUser researcher;
+    private static TestUser consentedUser;
 
     @BeforeClass
     public static void before() throws Exception {
         developer = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.DEVELOPER);
         researcher = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.RESEARCHER);
+        consentedUser = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
     }
 
     @AfterClass
@@ -51,7 +53,10 @@ public class UserParticipantTest {
             developer.signOutAndDeleteUser();    
         }
         if (researcher != null) {
-            researcher.signOutAndDeleteUser();;
+            researcher.signOutAndDeleteUser();
+        }
+        if (consentedUser != null) {
+            consentedUser.signOutAndDeleteUser();
         }
     }
 
@@ -155,109 +160,47 @@ public class UserParticipantTest {
     }
 
     @Test
-    public void canNotUpdateRecordNote() throws Exception {
-        TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
+    public void nonAdminCanNotUpdateOrViewRecordNote() throws Exception {
         ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
-        try {
-            ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
+        ParticipantsApi participantsApi = consentedUser.getClient(ParticipantsApi.class);
 
-            StudyParticipant preUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
-                    .execute().body();
-            assertNull(preUpdateParticipant.getFirstName());
-            assertNull(preUpdateParticipant.getNote());
+        StudyParticipant preNoteParticipant = researchersApi.getParticipantById(consentedUser.getUserId(), false)
+                .execute().body();
+        preNoteParticipant.setNote("original note");
+        researchersApi.updateParticipant(consentedUser.getUserId(), preNoteParticipant).execute();
 
-            StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
+        StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
+        participant.setNote("participant attempted note");
+        participantsApi.updateUsersParticipantRecord(participant).execute().body();
 
-            participant.setFirstName("participant attempted firstName");
-            participant.setNote("participant attempted note");
+        // Verifying non-Admin user can not update or delete their own note field
+        StudyParticipant adminPostUpdateParticipant = researchersApi.getParticipantById(consentedUser.getUserId(), false)
+                .execute().body();
+        assertEquals("original note", adminPostUpdateParticipant.getNote());
 
-            participantsApi.updateUsersParticipantRecord(participant).execute().body();
-
-            StudyParticipant postUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
-                    .execute().body();
-            assertEquals("participant attempted firstName", postUpdateParticipant.getFirstName());
-            assertNull(postUpdateParticipant.getNote());
-        } finally {
-            user.signOutAndDeleteUser();
-        }
-    }
-
-    @Test
-    public void participantCanNotEraseExistingNote() throws Exception {
-        TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
-        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
-        try {
-            ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
-
-            StudyParticipant preUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
-                    .execute().body();
-            preUpdateParticipant.setFirstName("original firstName");
-            preUpdateParticipant.setNote("existing note");
-
-            researchersApi.updateParticipant(user.getUserId(), preUpdateParticipant).execute();
-
-            StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
-            participant.setFirstName("participant attempted firstName");
-            participant.setNote("participant attempted note");
-
-            participantsApi.updateUsersParticipantRecord(participant).execute().body();
-
-            StudyParticipant postUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
-                    .execute().body();
-            assertEquals("participant attempted firstName", postUpdateParticipant.getFirstName());
-            assertEquals("existing note", postUpdateParticipant.getNote());
-        } finally {
-            user.signOutAndDeleteUser();
-        }
-    }
-
-    @Test
-    public void canNotViewRecordNote() throws Exception {
-        TestUser user = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
-        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
-        try {
-            ParticipantsApi participantsApi = user.getClient(ParticipantsApi.class);
-
-            StudyParticipant preUpdateParticipant = researchersApi.getParticipantById(user.getUserId(), false)
-                    .execute().body();
-            preUpdateParticipant.setFirstName("participant firstName");
-            preUpdateParticipant.setNote("participant note");
-
-            researchersApi.updateParticipant(user.getUserId(), preUpdateParticipant).execute();
-
-            StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
-            assertEquals("participant firstName", participant.getFirstName());
-            assertNull(participant.getNote());
-
-            StudyParticipant verifiedParticipant = researchersApi.getParticipantById(user.getUserId(), false)
-                    .execute().body();
-            assertEquals("participant firstName", verifiedParticipant.getFirstName());
-            assertEquals("participant note", verifiedParticipant.getNote());
-        } finally {
-            user.signOutAndDeleteUser();
-        }
+        // Verifying non-Admin user can not view note field on their own Participant Record
+        StudyParticipant nonAdminPostUpdateParticipant = participantsApi.getUsersParticipantRecord(false).execute().body();
+        assertNull(nonAdminPostUpdateParticipant.getNote());
     }
 
     @Test
     public void adminCanUpdateAndViewSelfNote() throws Exception {
-        TestUser admin = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.ADMIN);
-        ParticipantsApi adminParticipantsApi = admin.getClient(ParticipantsApi.class);
-        try {
-            StudyParticipant originalParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
-                    .execute().body();
-            assertNull(originalParticipant.getFirstName());
-            assertNull(originalParticipant.getNote());
+        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
+        StudyParticipant researcherParticipant = researchersApi.getParticipantById(researcher.getUserId(), false)
+                .execute().body();
+        researcherParticipant.setNote("original note");
+        researchersApi.updateParticipant(researcher.getUserId(), researcherParticipant).execute();
 
-            originalParticipant.setFirstName("admin firstName");
-            originalParticipant.setNote("admin note");
-            adminParticipantsApi.updateUsersParticipantRecord(originalParticipant).execute();
+        ParticipantsApi adminParticipantsApi = researcher.getClient(ParticipantsApi.class);
 
-            StudyParticipant updatedParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
-                    .execute().body();
-            assertEquals("admin firstName", updatedParticipant.getFirstName());
-            assertEquals("admin note", updatedParticipant.getNote());
-        } finally {
-            admin.signOutAndDeleteUser();
-        }
+        StudyParticipant preUpdateParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
+                .execute().body();
+        preUpdateParticipant.setNote("updated note");
+        adminParticipantsApi.updateUsersParticipantRecord(preUpdateParticipant).execute();
+
+        // Verifying note is updated and viewable in an administrative role
+        StudyParticipant updatedParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
+                .execute().body();
+        assertEquals("updated note", updatedParticipant.getNote());
     }
 }
