@@ -17,6 +17,7 @@ import org.junit.Test;
 import org.junit.experimental.categories.Category;
 
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
+import org.sagebionetworks.bridge.rest.api.ForResearchersApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.model.Role;
 import org.sagebionetworks.bridge.rest.model.StudyParticipant;
@@ -36,16 +37,26 @@ import java.util.List;
 public class UserParticipantTest {
 
     private static TestUser developer;
+    private static TestUser researcher;
+    private static TestUser consentedUser;
 
     @BeforeClass
     public static void before() throws Exception {
         developer = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.DEVELOPER);
+        researcher = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true, Role.RESEARCHER);
+        consentedUser = TestUserHelper.createAndSignInUser(UserParticipantTest.class, true);
     }
 
     @AfterClass
     public static void after() throws Exception {
         if (developer != null) {
             developer.signOutAndDeleteUser();    
+        }
+        if (researcher != null) {
+            researcher.signOutAndDeleteUser();
+        }
+        if (consentedUser != null) {
+            consentedUser.signOutAndDeleteUser();
         }
     }
 
@@ -148,4 +159,48 @@ public class UserParticipantTest {
         assertTrue(participant.getDataGroups().isEmpty());
     }
 
+    @Test
+    public void nonAdminCanNotUpdateOrViewRecordNote() throws Exception {
+        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
+        ParticipantsApi participantsApi = consentedUser.getClient(ParticipantsApi.class);
+
+        StudyParticipant preNoteParticipant = researchersApi.getParticipantById(consentedUser.getUserId(), false)
+                .execute().body();
+        preNoteParticipant.setNote("original note");
+        researchersApi.updateParticipant(consentedUser.getUserId(), preNoteParticipant).execute();
+
+        StudyParticipant participant = participantsApi.getUsersParticipantRecord(false).execute().body();
+        participant.setNote("participant attempted note");
+        participantsApi.updateUsersParticipantRecord(participant).execute().body();
+
+        // Verifying non-Admin user can not update or delete their own note field
+        StudyParticipant adminPostUpdateParticipant = researchersApi.getParticipantById(consentedUser.getUserId(), false)
+                .execute().body();
+        assertEquals("original note", adminPostUpdateParticipant.getNote());
+
+        // Verifying non-Admin user can not view note field on their own Participant Record
+        StudyParticipant nonAdminPostUpdateParticipant = participantsApi.getUsersParticipantRecord(false).execute().body();
+        assertNull(nonAdminPostUpdateParticipant.getNote());
+    }
+
+    @Test
+    public void adminCanUpdateAndViewSelfNote() throws Exception {
+        ForResearchersApi researchersApi = researcher.getClient(ForResearchersApi.class);
+        StudyParticipant researcherParticipant = researchersApi.getParticipantById(researcher.getUserId(), false)
+                .execute().body();
+        researcherParticipant.setNote("original note");
+        researchersApi.updateParticipant(researcher.getUserId(), researcherParticipant).execute();
+
+        ParticipantsApi adminParticipantsApi = researcher.getClient(ParticipantsApi.class);
+
+        StudyParticipant preUpdateParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
+                .execute().body();
+        preUpdateParticipant.setNote("updated note");
+        adminParticipantsApi.updateUsersParticipantRecord(preUpdateParticipant).execute();
+
+        // Verifying note is updated and viewable in an administrative role
+        StudyParticipant updatedParticipant = adminParticipantsApi.getUsersParticipantRecord(false)
+                .execute().body();
+        assertEquals("updated note", updatedParticipant.getNote());
+    }
 }

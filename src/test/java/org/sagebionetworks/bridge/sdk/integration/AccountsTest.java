@@ -27,6 +27,7 @@ import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
 import org.sagebionetworks.bridge.rest.api.ForOrgAdminsApi;
 import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
+import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.model.Account;
 import org.sagebionetworks.bridge.rest.model.AccountSummaryList;
@@ -37,6 +38,7 @@ import org.sagebionetworks.bridge.rest.model.Phone;
 import org.sagebionetworks.bridge.rest.model.RequestInfo;
 import org.sagebionetworks.bridge.rest.model.SignIn;
 import org.sagebionetworks.bridge.rest.model.SignUp;
+import org.sagebionetworks.bridge.rest.model.StudyParticipant;
 import org.sagebionetworks.bridge.rest.model.UserSessionInfo;
 import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
@@ -60,7 +62,7 @@ public class AccountsTest {
         orgAdmin = TestUserHelper.createAndSignInUser(AccountsTest.class, true, ORG_ADMIN);
         orgAdminApi = orgAdmin.getClient(ForOrgAdminsApi.class);
         orgId = orgAdmin.getSession().getOrgMembership();
-        
+
         IntegTestUtils.deletePhoneUser();
 
         ForSuperadminsApi superadminApi = admin.getClient(ForSuperadminsApi.class);
@@ -122,7 +124,7 @@ public class AccountsTest {
         assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
         assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
         assertEquals(orgId, retrieved.getOrgMembership());
-        assertEquals("test note 1", retrieved.getNote());
+        assertNull(retrieved.getNote());
         assertNull(retrieved.getPassword());
         
         AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
@@ -219,5 +221,54 @@ public class AccountsTest {
         identifierUpdate.phoneUpdate(new Phone().number("4082588569").regionCode("US"));
         info = accountsApi.updateIdentifiersForSelf(identifierUpdate).execute().body();
         assertEquals(PHONE.getNumber(), info.getPhone().getNumber()); // unchanged
+    }
+
+    @Test
+    public void nonAdminCannotViewNote() throws Exception {
+        String email = IntegTestUtils.makeEmail(AccountsTest.class);
+        SignUp signUp = new SignUp().appId(TEST_APP_ID).email(email).password(PASSWORD)
+                .consent(true)
+                .orgMembership(SAGE_ID);
+
+        emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+
+        SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
+        TestUser emailUser = TestUserHelper.getSignedInUser(signIn);
+
+        Account adminAccessTestUserAccount = orgAdminApi.getAccount(emailUserId).execute().body();
+        adminAccessTestUserAccount.setNote("setting a test note");
+        orgAdminApi.updateAccount(emailUserId, adminAccessTestUserAccount).execute();
+
+        // Verifying that the non-Admin user cannot see the note field
+        ForConsentedUsersApi testUserConsentedUsersApi = emailUser.getClient(ForConsentedUsersApi.class);
+        StudyParticipant nonAdminAccessTestUserAccount = testUserConsentedUsersApi.getUsersParticipantRecord(false).execute().body();
+        assertNull(nonAdminAccessTestUserAccount.getNote());
+    }
+
+    @Test
+    public void nonAdminCannotUpdateNote() throws Exception {
+        String email = IntegTestUtils.makeEmail(AccountsTest.class);
+        SignUp signUp = new SignUp().appId(TEST_APP_ID).email(email).password(PASSWORD)
+                .consent(true)
+                .orgMembership(SAGE_ID);
+
+        emailUserId = admin.getClient(ForAdminsApi.class).createUser(signUp).execute().body().getId();
+
+        SignIn signIn = new SignIn().appId(TEST_APP_ID).email(signUp.getEmail()).password(signUp.getPassword());
+        TestUser emailUser = TestUserHelper.getSignedInUser(signIn);
+
+        Account adminAccessTestUserAccount = orgAdminApi.getAccount(emailUserId).execute().body();
+        adminAccessTestUserAccount.setNote("original test note");
+        orgAdminApi.updateAccount(emailUserId, adminAccessTestUserAccount).execute();
+
+        // Attempting to update note through non-Admin account
+        ForConsentedUsersApi testUserConsentedUsersApi = emailUser.getClient(ForConsentedUsersApi.class);
+        StudyParticipant nonAdminAccessTestUserAccount = testUserConsentedUsersApi.getUsersParticipantRecord(false).execute().body();
+        nonAdminAccessTestUserAccount.setNote("updated test note");
+        testUserConsentedUsersApi.updateUsersParticipantRecord(nonAdminAccessTestUserAccount).execute();
+
+        // Verifying that original note was retained
+        Account adminAccessUpdatedTestUserAccount = orgAdminApi.getAccount(emailUserId).execute().body();
+        assertEquals("original test note", adminAccessUpdatedTestUserAccount.getNote());
     }
 }
