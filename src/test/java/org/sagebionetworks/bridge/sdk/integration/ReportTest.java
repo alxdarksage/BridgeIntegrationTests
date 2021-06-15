@@ -69,7 +69,7 @@ public class ReportTest {
 
     private static TestUser admin;
     private static TestUser developer;
-    private static TestUser appScopedDeveloper;
+    private static TestUser studyScopedDeveloper;
     private static TestUser worker;
     
     private String reportId;
@@ -83,7 +83,7 @@ public class ReportTest {
         developer = new TestUserHelper.Builder(ReportTest.class).withRoles(DEVELOPER)
                 .createAndSignInUser();
         
-        appScopedDeveloper = new TestUserHelper.Builder(ReportTest.class).withRoles(DEVELOPER)
+        studyScopedDeveloper = new TestUserHelper.Builder(ReportTest.class).withRoles(DEVELOPER)
                 .createAndSignInUser(); // assigned to study1, like other admin accounts
 
         worker = TestUserHelper.createAndSignInUser(ReportTest.class, false, WORKER, RESEARCHER);
@@ -122,8 +122,8 @@ public class ReportTest {
         if (developer != null) {
             developer.signOutAndDeleteUser();
         }
-        if (appScopedDeveloper != null) {
-            appScopedDeveloper.signOutAndDeleteUser();
+        if (studyScopedDeveloper != null) {
+            studyScopedDeveloper.signOutAndDeleteUser();
         }
         if (worker != null) {
             worker.signOutAndDeleteUser();
@@ -195,11 +195,11 @@ public class ReportTest {
 
         // Worker can make reports.
         ForWorkersApi workerReportsApi = worker.getClient(ForWorkersApi.class);
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATE1, "foo",
+        workerReportsApi.addParticipantReportRecordForWorker(reportId, makeReportDataForWorker(healthCode, DATE1, "foo",
                 "A")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATE2, "bar",
+        workerReportsApi.addParticipantReportRecordForWorker(reportId, makeReportDataForWorker(healthCode, DATE2, "bar",
                 "B")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATE3, "baz",
+        workerReportsApi.addParticipantReportRecordForWorker(reportId, makeReportDataForWorker(healthCode, DATE3, "baz",
                 "C")).execute();
 
         // User can get those reports.
@@ -235,11 +235,11 @@ public class ReportTest {
 
         // Worker can make reports.
         ForWorkersApi workerReportsApi = worker.getClient(ForWorkersApi.class);
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATETIME1, "foo",
+        workerReportsApi.addParticipantReportRecordForWorker(reportId, makeReportDataForWorker(healthCode, DATETIME1, "foo",
                 "A")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATETIME2, "bar",
+        workerReportsApi.addParticipantReportRecordForWorker(reportId, makeReportDataForWorker(healthCode, DATETIME2, "bar",
                 "B")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATETIME3, "baz",
+        workerReportsApi.addParticipantReportRecordForWorker(reportId, makeReportDataForWorker(healthCode, DATETIME3, "baz",
                 "C")).execute();
 
         // User can get those reports.
@@ -446,14 +446,17 @@ public class ReportTest {
     
     @Test
     public void studyReportsNotVisibleOutsideOfStudy() throws Exception {
-        StudyReportsApi devReportClient = appScopedDeveloper.getClient(StudyReportsApi.class);
+        // Use an admin to save the reports, as study-scoped developer cannot do it.
+        StudyReportsApi adminReportClient = admin.getClient(StudyReportsApi.class);
+        StudyReportsApi devReportClient = studyScopedDeveloper.getClient(StudyReportsApi.class);
         
         ReportData data1 = makeReportData(DATE1, "asdf", "A");
         data1.setStudyIds(ImmutableList.of(STUDY_ID_1));
         
         ReportData data2 = makeReportData(DATE2, "asdf", "B");
-        devReportClient.addStudyReportRecord(reportId, data1).execute();
-        devReportClient.addStudyReportRecord(reportId, data2).execute();
+        
+        adminReportClient.addStudyReportRecord(reportId, data1).execute();
+        adminReportClient.addStudyReportRecord(reportId, data2).execute();
         
         // Not a member of the study used for these report records
         // Just assign an external ID in order to enroll the account in a study
@@ -472,7 +475,7 @@ public class ReportTest {
         
         // Make it public, and the user *can* see it
         index.setPublic(true);
-        devReportClient.updateStudyReportIndex(index.getIdentifier(), index).execute();
+        adminReportClient.updateStudyReportIndex(index.getIdentifier(), index).execute();
         
         ReportDataList list = reportsApi.getStudyReportRecords(reportId, SEARCH_START_DATE, SEARCH_END_DATE).execute().body();
         assertEquals(2, list.getItems().size());
@@ -500,56 +503,9 @@ public class ReportTest {
         }
     }
     
-    @Test
-    public void participantReportsNotVisibleOutsideOfStudy() throws Exception {
-        // It would seem to be dumb to create reports for a participant that are associated to studies such that the
-        // user will not be able to see them. Nevertheless, if it happens, we enforce visibility constraints.
-        // Just assign an external ID in order to enroll the account in a study
-        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
-                .withExternalIds(ImmutableMap.of(STUDY_ID_2, Tests.randomIdentifier(ReportTest.class)))
-                .createAndSignInUser();
-        
-        String healthCode = worker.getClient(ParticipantsApi.class)
-                .getParticipantById(studyScopedUser.getUserId(), false).execute().body().getHealthCode();
-
-        // Note that the first record saved, sets the studies in the index and applies to all records after
-        // that. So the scoped user cannot then retrieve the records because they are not in study1.
-        ForWorkersApi workerApi = worker.getClient(ForWorkersApi.class);
-        ReportDataForWorker data1 = makeReportDataForWorker(healthCode, DATE1, "asdf", "A");
-        data1.setStudyIds(ImmutableList.of(STUDY_ID_1));
-        ReportDataForWorker data2 = makeReportDataForWorker(healthCode, DATE2, "asdf", "B");
-        workerApi.addParticipantReportRecord(reportId, data1).execute();
-        workerApi.addParticipantReportRecord(reportId, data2).execute();
-        
-        // The index now exists and can be retrieved.
-        ParticipantReportsApi reportsApi = studyScopedUser.getClient(ParticipantReportsApi.class);
-        ReportIndex index = reportsApi.getParticipantReportIndex(reportId).execute().body();
-        assertTrue(index.getStudyIds().contains(STUDY_ID_1));
-        
-        try {
-            reportsApi.getParticipantReportRecords(reportId, SEARCH_START_DATE, SEARCH_END_DATE).execute().body();
-            fail("Should have thrown an exception");
-        } catch(UnauthorizedException e) {
-            // expected, and from the correct call.
-        }
-        
-        String appId = studyScopedUser.getAppId();
-        String userId = studyScopedUser.getUserId();
-        // The worker, which is not in any studies, can get these reports
-        ReportDataList list = workerApi.getParticipantReportsForParticipant(appId, userId, reportId, SEARCH_START_DATE, SEARCH_END_DATE).execute().body();
-        assertEquals(2, list.getItems().size());
-        ReportData retrieved1 = list.getItems().get(0);
-        assertEquals(DATE1.toString(), retrieved1.getDate());
-        assertEquals(DATE1, retrieved1.getLocalDate());
-        assertEquals("A", ((Map<String,String>)retrieved1.getData()).get("asdf"));
-        assertNull(retrieved1.getStudyIds());
-        
-        ReportData retrieved2 = list.getItems().get(1);
-        assertEquals(DATE2.toString(), retrieved2.getDate());
-        assertEquals(DATE2, retrieved2.getLocalDate());
-        assertEquals("B", ((Map<String,String>)retrieved2.getData()).get("asdf"));
-        assertNull(retrieved2.getStudyIds());
-    }
+    // This test is removed because we have changed how we determine access for a participant:
+    // if the call is to retrieve a report for self, it will succeed (we no longer check study
+    // associations).
     
     private static ReportData makeReportData(LocalDate date, String key, String value) {
         ReportData reportData = new ReportData();

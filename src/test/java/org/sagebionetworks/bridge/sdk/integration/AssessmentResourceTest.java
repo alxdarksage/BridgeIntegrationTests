@@ -6,13 +6,11 @@ import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertTrue;
-import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.ResourceCategory.DATA_REPOSITORY;
 import static org.sagebionetworks.bridge.rest.model.ResourceCategory.LICENSE;
 import static org.sagebionetworks.bridge.rest.model.ResourceCategory.WEBSITE;
 import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_1;
-import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_2;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.randomIdentifier;
 
 import java.io.IOException;
@@ -28,7 +26,6 @@ import org.junit.Test;
 import org.sagebionetworks.bridge.rest.api.AssessmentsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.SharedAssessmentsApi;
-import org.sagebionetworks.bridge.rest.exceptions.UnauthorizedException;
 import org.sagebionetworks.bridge.rest.model.Assessment;
 import org.sagebionetworks.bridge.rest.model.AssessmentList;
 import org.sagebionetworks.bridge.rest.model.ExternalResource;
@@ -45,11 +42,9 @@ public class AssessmentResourceTest {
     private static final String TITLE2 = "mPower Website";
     private TestUser admin;
     private TestUser developer;
-    private TestUser otherDeveloper;
     private String id;
     private AssessmentsApi assessmentApi;
     private SharedAssessmentsApi sharedAssessmentsApi;
-    private AssessmentsApi badDevApi;
 
     @Before
     public void before() throws Exception {
@@ -60,22 +55,14 @@ public class AssessmentResourceTest {
         developer = new TestUserHelper.Builder(AssessmentResourceTest.class).withRoles(DEVELOPER).createAndSignInUser();
         orgsApi.addMember(ORG_ID_1, developer.getUserId()).execute();
         
-        otherDeveloper = new TestUserHelper.Builder(AssessmentResourceTest.class).withRoles(DEVELOPER)
-                .createAndSignInUser();
-        orgsApi.addMember(ORG_ID_2, otherDeveloper.getUserId()).execute();
-        
         assessmentApi = developer.getClient(AssessmentsApi.class);
         sharedAssessmentsApi = developer.getClient(SharedAssessmentsApi.class);
-        badDevApi = otherDeveloper.getClient(AssessmentsApi.class);
     }
 
     @After
     public void after() throws IOException {
         if (developer != null) {
             developer.signOutAndDeleteUser();
-        }
-        if (otherDeveloper != null) {
-            otherDeveloper.signOutAndDeleteUser();
         }
         TestUser admin = TestUserHelper.getSignedInAdmin();
         AssessmentsApi api = admin.getClient(AssessmentsApi.class);
@@ -179,20 +166,6 @@ public class AssessmentResourceTest {
         assertEquals(Integer.valueOf(50), rp.getPageSize());
         assertEquals(Integer.valueOf(0), rp.getOffsetBy());
         assertFalse(rp.isIncludeDeleted());
-
-        // Other developers can see local resources, just as they can see the assessment
-        resourcesPage = badDevApi.getAssessmentResources(
-                id, null, null, null, null, null, null).execute().body();
-        assertFalse(resourcesPage.getItems().isEmpty());
-        
-        // however, they cannot update these resources
-        try {
-            resource1.setTitle("This will never be persisted");
-            badDevApi.updateAssessmentResource(id, resourceGuid, resource1).execute();
-            fail("Should have thrown exception");
-        } catch(UnauthorizedException e) {
-            // expected
-        }
 
         // publish the assessment and resource
         assessmentApi.publishAssessment(assessment.getGuid(), null).execute().body();

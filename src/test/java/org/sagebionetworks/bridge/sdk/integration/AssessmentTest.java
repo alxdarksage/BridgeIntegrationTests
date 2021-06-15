@@ -75,7 +75,7 @@ public class AssessmentTest {
     private String id;
     private String markerTag;
     private AssessmentsApi assessmentApi;
-    private AssessmentsApi badDevApi;
+    private AssessmentsApi otherDevApi;
     
     @Before
     public void before() throws Exception {
@@ -92,7 +92,7 @@ public class AssessmentTest {
         orgsApi.addMember(ORG_ID_2, otherDeveloper.getUserId()).execute();
         
         assessmentApi = developer.getClient(AssessmentsApi.class);
-        badDevApi = otherDeveloper.getClient(AssessmentsApi.class);
+        otherDevApi = otherDeveloper.getClient(AssessmentsApi.class);
     }
     
     @After
@@ -141,7 +141,7 @@ public class AssessmentTest {
                 .validationStatus("Not validated")
                 .normingStatus("Not normed")
                 .osName("Both")
-                .ownerId(ORG_ID_1)
+                .ownerId("not-real")
                 .minutesToComplete(15)
                 .colorScheme(COLOR_SCHEME)
                 .labels(LABELS)
@@ -156,16 +156,6 @@ public class AssessmentTest {
             assessmentApi.createAssessment(unsavedAssessment).execute().body();
             fail("Should have thrown an exception");
         } catch(EntityAlreadyExistsException e) {
-        }
-        
-        // createAssessment fails when study does not exist
-        unsavedAssessment.setOwnerId("not-real");
-        unsavedAssessment.setIdentifier(randomIdentifier(AssessmentTest.class));
-        try {
-            assessmentApi.createAssessment(unsavedAssessment).execute();
-            fail("Should have thrown an exception");
-        } catch(EntityNotFoundException e) {
-            assertEquals("Organization not found.", e.getMessage());
         }
         
         // getAssessmentByGUID works
@@ -235,14 +225,6 @@ public class AssessmentTest {
         assertEquals(secondRevision.getTitle(), secondRevUpdated.getTitle());
         assertTrue(secondRevision.getVersion() < secondRevUpdated.getVersion());
         
-        // updateAssessment fails for developer who doesn't own the assessment
-        try {
-            secondRevision.setSummary("This will never be persisted");
-            badDevApi.updateAssessment(secondRevision.getGuid(), secondRevision).execute();
-            fail("Should have thrown an exception");
-        } catch(UnauthorizedException e) {
-        }
-        
         // BUG: shared assessment with a revision lower than the highest revision in another app, with the 
         // same identifier, was not appearing in the API. Verify that this works before deleting one of the 
         // revisions.
@@ -255,13 +237,6 @@ public class AssessmentTest {
         
         // deleteAssessment physical=false works
         assessmentApi.deleteAssessment(secondRevision.getGuid(), false).execute();
-        
-        // deleteAssessment physical=false fails for developer who doesn't own the assessment
-        try {
-            badDevApi.deleteAssessment(secondRevision.getGuid(), false).execute();
-            fail("Should have thrown an exception");
-        } catch(EntityNotFoundException e) {
-        }
         
         // now the first version is the latest
         latest = assessmentApi.getLatestAssessmentRevision(id).execute().body();
@@ -333,7 +308,7 @@ public class AssessmentTest {
             SharedAssessmentsApi badDevSharedApi = otherDeveloper.getClient(SharedAssessmentsApi.class);
             otherAssessment = badDevSharedApi.importSharedAssessment(
                     shared.getGuid(), ORG_ID_2, null).execute().body();
-            badDevApi.publishAssessment(otherAssessment.getGuid(), null).execute();
+            otherDevApi.publishAssessment(otherAssessment.getGuid(), null).execute();
             fail("Should have thrown exception");
         } catch(UnauthorizedException e) {
             assertTrue(e.getMessage().contains("Assessment exists in shared library under a different owner"));
