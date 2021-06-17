@@ -75,6 +75,7 @@ public class ParticipantFileTest {
 
         assertNotNull(keys);
         assertEquals(file.getMimeType(), keys.getMimeType());
+        assertEquals(keys.getCreatedOn().plusDays(1), keys.getExpires());
         String uploadUrl = keys.getUploadUrl();
 
         URL url = new URL(uploadUrl);
@@ -124,6 +125,23 @@ public class ParticipantFileTest {
         resultList = results.getItems();
         assertEquals(1, resultList.size());
         assertNull(results.getNextPageOffsetKey());
+
+        // Updating an existing file
+        ParticipantFile updateKeys = userApi.createParticipantFile("file_id", file).execute().body();
+        url = new URL(updateKeys.getUploadUrl());
+        connection = (HttpURLConnection) url.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("PUT");
+        connection.setRequestProperty("Content-Type", "text/plain");
+        out = new OutputStreamWriter(connection.getOutputStream());
+        out.write("Updated text to S3.");
+        out.close();
+        connection.disconnect();
+
+        ResponseBody updateBody = userApi.getParticipantFile("file_id").execute().body();
+        try (InputStream content = updateBody.byteStream(); Scanner sc = new Scanner(content)) {
+            assertEquals("Updated text to S3.", sc.nextLine());
+        }
 
         Message deleteMessage = userApi.deleteParticipantFile("file_id").execute().body();
         assertNotNull(deleteMessage);
