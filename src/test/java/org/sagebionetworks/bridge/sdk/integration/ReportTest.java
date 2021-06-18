@@ -195,11 +195,11 @@ public class ReportTest {
 
         // Worker can make reports.
         ForWorkersApi workerReportsApi = worker.getClient(ForWorkersApi.class);
-        workerReportsApi.addParticipantReportRecordForWorker(
+        workerReportsApi.addParticipantReportRecord(
                 reportId, makeReportDataForWorker(healthCode, DATE1, "foo", "A")).execute();
-        workerReportsApi.addParticipantReportRecordForWorker(
+        workerReportsApi.addParticipantReportRecord(
                 reportId, makeReportDataForWorker(healthCode, DATE2, "bar", "B")).execute();
-        workerReportsApi.addParticipantReportRecordForWorker(
+        workerReportsApi.addParticipantReportRecord(
                 reportId, makeReportDataForWorker(healthCode, DATE3, "baz", "C")).execute();
 
         // User can get those reports.
@@ -235,11 +235,11 @@ public class ReportTest {
 
         // Worker can make reports.
         ForWorkersApi workerReportsApi = worker.getClient(ForWorkersApi.class);
-        workerReportsApi.addParticipantReportRecordForWorker(
+        workerReportsApi.addParticipantReportRecord(
                 reportId, makeReportDataForWorker(healthCode, DATETIME1, "foo", "A")).execute();
-        workerReportsApi.addParticipantReportRecordForWorker(
+        workerReportsApi.addParticipantReportRecord(
                 reportId, makeReportDataForWorker(healthCode, DATETIME2, "bar", "B")).execute();
-        workerReportsApi.addParticipantReportRecordForWorker(
+        workerReportsApi.addParticipantReportRecord(
                 reportId, makeReportDataForWorker(healthCode, DATETIME3, "baz", "C")).execute();
 
         // User can get those reports.
@@ -518,8 +518,8 @@ public class ReportTest {
         ReportDataForWorker data1 = makeReportDataForWorker(healthCode, DATE1, "asdf", "A");
         data1.setStudyIds(ImmutableList.of(STUDY_ID_1));
         ReportDataForWorker data2 = makeReportDataForWorker(healthCode, DATE2, "asdf", "B");
-        workerApi.addParticipantReportRecordForWorker(reportId, data1).execute();
-        workerApi.addParticipantReportRecordForWorker(reportId, data2).execute();
+        workerApi.addParticipantReportRecord(reportId, data1).execute();
+        workerApi.addParticipantReportRecord(reportId, data2).execute();
         
         // The index now exists and can be retrieved.
         ParticipantReportsApi study2ReportsApi = study2User.getClient(ParticipantReportsApi.class);
