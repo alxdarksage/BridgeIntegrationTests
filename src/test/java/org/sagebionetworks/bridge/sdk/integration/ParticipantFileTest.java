@@ -22,6 +22,7 @@ import java.util.Scanner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class ParticipantFileTest {
@@ -75,7 +76,8 @@ public class ParticipantFileTest {
 
         assertNotNull(keys);
         assertEquals(file.getMimeType(), keys.getMimeType());
-        assertEquals(keys.getCreatedOn().plusDays(1), keys.getExpires());
+        assertTrue("Should be close to 24hrs difference between createdOn and expiresOn",
+                Math.abs(keys.getCreatedOn().plusDays(1).getMillis() - keys.getExpiresOn().getMillis()) < 1000);
         String uploadUrl = keys.getUploadUrl();
 
         URL url = new URL(uploadUrl);
@@ -136,6 +138,7 @@ public class ParticipantFileTest {
         out = new OutputStreamWriter(connection.getOutputStream());
         out.write("Updated text to S3.");
         out.close();
+        assertEquals(200, connection.getResponseCode());
         connection.disconnect();
 
         ResponseBody updateBody = userApi.getParticipantFile("file_id").execute().body();
