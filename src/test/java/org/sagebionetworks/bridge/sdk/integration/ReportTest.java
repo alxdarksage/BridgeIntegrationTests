@@ -74,7 +74,7 @@ public class ReportTest {
     
     private String reportId;
     private TestUser user;
-    private TestUser studyScopedUser;
+    private TestUser study2User;
 
     @BeforeClass
     public static void beforeClass() throws Exception {
@@ -111,9 +111,9 @@ public class ReportTest {
             developerApi.deleteAllParticipantReportRecords(user.getUserId(), reportId).execute();
             user.signOutAndDeleteUser();
         }
-        if (studyScopedUser != null) {
-            developerApi.deleteAllParticipantReportRecords(studyScopedUser.getUserId(), reportId).execute();
-            studyScopedUser.signOutAndDeleteUser();
+        if (study2User != null) {
+            developerApi.deleteAllParticipantReportRecords(study2User.getUserId(), reportId).execute();
+            study2User.signOutAndDeleteUser();
         }
     }
     
@@ -195,12 +195,12 @@ public class ReportTest {
 
         // Worker can make reports.
         ForWorkersApi workerReportsApi = worker.getClient(ForWorkersApi.class);
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATE1, "foo",
-                "A")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATE2, "bar",
-                "B")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATE3, "baz",
-                "C")).execute();
+        workerReportsApi.addParticipantReportRecord(
+                reportId, makeReportDataForWorker(healthCode, DATE1, "foo", "A")).execute();
+        workerReportsApi.addParticipantReportRecord(
+                reportId, makeReportDataForWorker(healthCode, DATE2, "bar", "B")).execute();
+        workerReportsApi.addParticipantReportRecord(
+                reportId, makeReportDataForWorker(healthCode, DATE3, "baz", "C")).execute();
 
         // User can get those reports.
         ParticipantReportsApi userReportsApi = user.getClient(ParticipantReportsApi.class);
@@ -235,12 +235,12 @@ public class ReportTest {
 
         // Worker can make reports.
         ForWorkersApi workerReportsApi = worker.getClient(ForWorkersApi.class);
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATETIME1, "foo",
-                "A")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATETIME2, "bar",
-                "B")).execute();
-        workerReportsApi.addParticipantReportRecord(reportId, makeReportDataForWorker(healthCode, DATETIME3, "baz",
-                "C")).execute();
+        workerReportsApi.addParticipantReportRecord(
+                reportId, makeReportDataForWorker(healthCode, DATETIME1, "foo", "A")).execute();
+        workerReportsApi.addParticipantReportRecord(
+                reportId, makeReportDataForWorker(healthCode, DATETIME2, "bar", "B")).execute();
+        workerReportsApi.addParticipantReportRecord(
+                reportId, makeReportDataForWorker(healthCode, DATETIME3, "baz", "C")).execute();
 
         // User can get those reports.
         ParticipantReportsApi userReportsApi = user.getClient(ParticipantReportsApi.class);
@@ -457,10 +457,10 @@ public class ReportTest {
         
         // Not a member of the study used for these report records
         // Just assign an external ID in order to enroll the account in a study
-        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
+        study2User = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
                 .withExternalIds(ImmutableMap.of(STUDY_ID_2, Tests.randomIdentifier(ReportTest.class)))
                 .createAndSignInUser();
-        StudyReportsApi reportsApi = studyScopedUser.getClient(StudyReportsApi.class);
+        StudyReportsApi reportsApi = study2User.getClient(StudyReportsApi.class);
         ReportIndex index = reportsApi.getStudyReportIndex(reportId).execute().body();
         assertTrue(index.getStudyIds().contains(STUDY_ID_1));
         try {
@@ -501,19 +501,19 @@ public class ReportTest {
     }
     
     @Test
-    public void participantReportsNotVisibleOutsideOfStudy() throws Exception {
-        // It would seem to be dumb to create reports for a participant that are associated to studies such that the
-        // user will not be able to see them. Nevertheless, if it happens, we enforce visibility constraints.
-        // Just assign an external ID in order to enroll the account in a study
-        studyScopedUser = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
+    public void participantReportsVisibleRegardlessOfStudy() throws Exception {
+        // It would seem to be dumb to create reports for a participant that are associated to studies the user
+        // is not enrolled in. In this edge case we are now erring on the side of returning the report to
+        // the user anyway.
+        study2User = new TestUserHelper.Builder(ReportTest.class).withConsentUser(false)
                 .withExternalIds(ImmutableMap.of(STUDY_ID_2, Tests.randomIdentifier(ReportTest.class)))
                 .createAndSignInUser();
         
         String healthCode = worker.getClient(ParticipantsApi.class)
-                .getParticipantById(studyScopedUser.getUserId(), false).execute().body().getHealthCode();
+                .getParticipantById(study2User.getUserId(), false).execute().body().getHealthCode();
 
         // Note that the first record saved, sets the studies in the index and applies to all records after
-        // that. So the scoped user cannot then retrieve the records because they are not in study1.
+        // that. So this is a report for a study2 user, but it is associated to study1.
         ForWorkersApi workerApi = worker.getClient(ForWorkersApi.class);
         ReportDataForWorker data1 = makeReportDataForWorker(healthCode, DATE1, "asdf", "A");
         data1.setStudyIds(ImmutableList.of(STUDY_ID_1));
@@ -522,19 +522,18 @@ public class ReportTest {
         workerApi.addParticipantReportRecord(reportId, data2).execute();
         
         // The index now exists and can be retrieved.
-        ParticipantReportsApi reportsApi = studyScopedUser.getClient(ParticipantReportsApi.class);
-        ReportIndex index = reportsApi.getParticipantReportIndex(reportId).execute().body();
+        ParticipantReportsApi study2ReportsApi = study2User.getClient(ParticipantReportsApi.class);
+        ReportIndex index = study2ReportsApi.getParticipantReportIndex(reportId).execute().body();
         assertTrue(index.getStudyIds().contains(STUDY_ID_1));
         
-        try {
-            reportsApi.getParticipantReportRecords(reportId, SEARCH_START_DATE, SEARCH_END_DATE).execute().body();
-            fail("Should have thrown an exception");
-        } catch(UnauthorizedException e) {
-            // expected, and from the correct call.
-        }
+        // And the report can still be retrieved
+        ReportDataList records = study2ReportsApi.getParticipantReportRecords(reportId, SEARCH_START_DATE, SEARCH_END_DATE).execute().body();
+        assertTrue(!records.getItems().isEmpty());
+        assertEquals("{asdf=A}", records.getItems().get(0).getData().toString());
+        assertEquals("{asdf=B}", records.getItems().get(1).getData().toString());
         
-        String appId = studyScopedUser.getAppId();
-        String userId = studyScopedUser.getUserId();
+        String appId = study2User.getAppId();
+        String userId = study2User.getUserId();
         // The worker, which is not in any studies, can get these reports
         ReportDataList list = workerApi.getParticipantReportsForParticipant(appId, userId, reportId, SEARCH_START_DATE, SEARCH_END_DATE).execute().body();
         assertEquals(2, list.getItems().size());
