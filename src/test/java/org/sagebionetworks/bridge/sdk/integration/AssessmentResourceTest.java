@@ -29,7 +29,7 @@ import org.junit.Test;
 import org.sagebionetworks.bridge.rest.api.AssessmentsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.SharedAssessmentsApi;
-import org.sagebionetworks.bridge.rest.exceptions.UnauthorizedException;
+import org.sagebionetworks.bridge.rest.exceptions.EntityNotFoundException;
 import org.sagebionetworks.bridge.rest.model.Assessment;
 import org.sagebionetworks.bridge.rest.model.AssessmentList;
 import org.sagebionetworks.bridge.rest.model.ExternalResource;
@@ -365,17 +365,20 @@ public class AssessmentResourceTest {
         assertNotEquals(version, resource1.getVersion());
         assertTrue(resource1.isUpToDate());
         
-        // Other developers can see local resources, just as they can see the assessment (for now)
-        resourcesPage = assessmentApiOrg2.getAssessmentResources(
-                id, null, null, null, null, null, null).execute().body();
-        assertFalse(resourcesPage.getItems().isEmpty());
-        
-        // But they cannot update a resource (soon they will not be able to see it, either)
+        // Other study designer cannot see this local resource because the assessment is not accessible
+        try {
+            resourcesPage = assessmentApiOrg2.getAssessmentResources(
+                    id, null, null, null, null, null, null).execute().body();
+            fail("Should have thrown exception");
+        } catch(EntityNotFoundException e) {
+        }
+
+        // They also cannot update the resource for the same reason (assessment not visible)
         try {
             resource1.setTitle("This will be persisted");
             assessmentApiOrg2.updateAssessmentResource(id, resourceGuid, resource1).execute().body();
             fail("Should have thrown exception");
-        } catch(UnauthorizedException e) {
+        } catch(EntityNotFoundException e) {
             
         }
 
