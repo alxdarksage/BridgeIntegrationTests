@@ -86,9 +86,12 @@ public class AssessmentResourceTest {
             api.deleteAssessment(oneRevision.getGuid(), true).execute();
         }
         
-        revisions = sharedApi.getSharedAssessmentRevisionsById(id, null, null, true).execute().body();
-        for (Assessment oneRevision : revisions.getItems()) {
-            sharedApi.deleteSharedAssessment(oneRevision.getGuid(), true).execute();
+        try {
+            revisions = sharedApi.getSharedAssessmentRevisionsById(id, null, null, true).execute().body();
+            for (Assessment oneRevision : revisions.getItems()) {
+                sharedApi.deleteSharedAssessment(oneRevision.getGuid(), true).execute();
+            }
+        } catch(EntityNotFoundException e) {
         }
     }
 
@@ -312,13 +315,12 @@ public class AssessmentResourceTest {
         orgsApi.addMember(ORG_ID_2, studyDesignerOrg2.getUserId()).execute();
         
         assessmentApiOrg1 = studyDesignerOrg1.getClient(AssessmentsApi.class);
-        sharedAssessmentsApiOrg1 = studyDesignerOrg1.getClient(SharedAssessmentsApi.class);
         assessmentApiOrg2 = studyDesignerOrg2.getClient(AssessmentsApi.class);
         
         Assessment unsavedAssessment = new Assessment().identifier(id).title("AssessmentResourceTest assessment")
                 .osName("Android").ownerId(ORG_ID_1).revision(1L);
 
-        Assessment assessment = assessmentApiOrg1.createAssessment(unsavedAssessment).execute().body();
+        assessmentApiOrg1.createAssessment(unsavedAssessment).execute().body();
         
         ExternalResource resource1 = new ExternalResource().title(TITLE1).url(URL1).category(DATA_REPOSITORY)
                 .minRevision(1).maxRevision(1).publishers(ImmutableList.of("Sage Bionetworks"));
@@ -335,39 +337,12 @@ public class AssessmentResourceTest {
         
         String resourceGuid = resource1.getGuid();
         
-        // create this for later         
+        // create this for test          
         resource2 = assessmentApiOrg1.createAssessmentResource(id, resource2).execute().body();
-
-        // retrieve the resources and test some fields
-        PagedExternalResourceList resourcesPage = assessmentApiOrg1.getAssessmentResources(
-                id, null, null, null, null, null, false).execute().body();
-        assertEquals(2, resourcesPage.getItems().size());
-        assertEquals(Integer.valueOf(2), resourcesPage.getTotal());
-        resource1 = resourcesPage.getItems().get(0);
-        assertEquals(TITLE1, resource1.getTitle());
-        assertEquals(URL1, resource1.getUrl());
-        assertTrue(resource1.isUpToDate());
-        assertEquals(version, resource1.getVersion());
-        
-        // change and update assessment the assessment
-        assessment.setTitle("new title");
-        assessment.setRevision(2L);
-        assessment = assessmentApiOrg1.updateAssessment(assessment.getGuid(), assessment).execute().body();
-        
-        // verify the resource is no longer up-to-date
-        resource1 = assessmentApiOrg1.getAssessmentResource(id, resourceGuid).execute().body();
-        assertFalse(resource1.isUpToDate());
-        
-        // update the resource. this should increment the version.
-        resource1.setUrl(URL1 + "2");
-        resource1 = assessmentApiOrg1.updateAssessmentResource(id, resourceGuid, resource1).execute().body();
-        assertEquals(URL1 + "2", resource1.getUrl());
-        assertNotEquals(version, resource1.getVersion());
-        assertTrue(resource1.isUpToDate());
         
         // Other study designer cannot see this local resource because the assessment is not accessible
         try {
-            resourcesPage = assessmentApiOrg2.getAssessmentResources(
+            PagedExternalResourceList resourcesPage = assessmentApiOrg2.getAssessmentResources(
                     id, null, null, null, null, null, null).execute().body();
             fail("Should have thrown exception");
         } catch(EntityNotFoundException e) {
@@ -381,73 +356,5 @@ public class AssessmentResourceTest {
         } catch(EntityNotFoundException e) {
             
         }
-
-        // publish the assessment and resource
-        assessmentApiOrg1.publishAssessment(assessment.getGuid(), null).execute().body();
-        assessmentApiOrg1.publishAssessmentResource(id, ImmutableList.of(resourceGuid)).execute().body();
-
-        // Resource should be published along with the assessment.
-        PagedExternalResourceList sharedResourcesPage = sharedAssessmentsApiOrg1.getSharedAssessmentResources(
-                id, null, null, null, null, null, null).execute().body();
-        assertEquals(1, sharedResourcesPage.getItems().size());
-        assertEquals(TITLE1, sharedResourcesPage.getItems().get(0).getTitle());
-        
-        // publish assessment resource again. the existing record should be updated
-        String newTitle = "Different Title: " + randomIdentifier(AssessmentResourceTest.class);
-        resource1.setTitle(newTitle);
-        resource1 = assessmentApiOrg1.updateAssessmentResource(id, resourceGuid, resource1).execute().body();
-
-        ExternalResource sharedResource = assessmentApiOrg1.publishAssessmentResource(id, 
-                ImmutableList.of(resourceGuid)).execute().body().getItems().get(0);
-        
-        sharedResourcesPage = sharedAssessmentsApiOrg1.getSharedAssessmentResources(id, null, null, 
-                null, null, null, true).execute().body();
-        assertEquals(newTitle, sharedResourcesPage.getItems().get(0).getTitle());
-        
-        // get individual shared assessment
-        sharedResource = sharedAssessmentsApiOrg1.getSharedAssessmentResource(id, sharedResource.getGuid()).execute().body();
-        assertNotNull(sharedResource);
-        
-        // import the assessment and resource back to the local context.
-        sharedResource.setTitle(newTitle);
-        sharedResource = sharedAssessmentsApiOrg1.updateSharedAssessmentResource(
-                id, resourceGuid, sharedResource).execute().body();
-        sharedAssessmentsApiOrg1.importSharedAssessmentResource(id, ImmutableList.of(resourceGuid)).execute();
-
-        resourcesPage = assessmentApiOrg1.getAssessmentResources(id, null, null, null, null, null, true).execute().body();
-        assertTrue(resourcesPage.getItems().stream().anyMatch(res -> res.getTitle().equals(newTitle)));
-        
-        // Okay, after these copies, there should still be two resources for the local and for the shared objects
-        int localCount = assessmentApiOrg1.getAssessmentResources(id, null, null, null, null, null, false).execute().body()
-                .getTotal();
-        int sharedCount = sharedAssessmentsApiOrg1.getSharedAssessmentResources(id, null, null, null, null, null, false)
-                .execute().body().getTotal();
-        assertEquals(2, localCount);
-        assertEquals(1, sharedCount);
-        
-        // logically delete the local resources
-        assessmentApiOrg1.deleteAssessmentResource(id, resource1.getGuid(), false).execute();
-        assessmentApiOrg1.deleteAssessmentResource(id, resource2.getGuid(), false).execute();
-        localCount = assessmentApiOrg1.getAssessmentResources(
-                id, null, null, null, null, null, false).execute().body().getTotal();
-        assertEquals(0, localCount);
-        localCount = assessmentApiOrg1.getAssessmentResources(
-                id, null, null, null, null, null, true).execute().body().getTotal();
-        assertEquals(2, localCount);
-        // can still be retrieved with knowledge of the GUID
-        resource1 = assessmentApiOrg1.getAssessmentResource(id, resource1.getGuid()).execute().body();
-        assertNotNull(resource1);
-        
-        // logically delete the shared resource
-        admin.getClient(SharedAssessmentsApi.class).deleteSharedAssessmentResource(
-                id, sharedResource.getGuid(), false).execute();
-        sharedCount = sharedAssessmentsApiOrg1.getSharedAssessmentResources(
-                id, null, null, null, null, null, false).execute().body().getTotal();
-        assertEquals(0, sharedCount);
-        sharedCount = sharedAssessmentsApiOrg1.getSharedAssessmentResources(
-                id, null, null, null, null, null, true).execute().body().getTotal();
-        assertEquals(1, sharedCount);
-        sharedResource = sharedAssessmentsApiOrg1.getSharedAssessmentResource(id, sharedResource.getGuid()).execute().body();
-        assertNotNull(sharedResource);
     }
 }
