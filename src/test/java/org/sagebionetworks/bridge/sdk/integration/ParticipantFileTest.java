@@ -22,6 +22,7 @@ import java.util.Scanner;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 public class ParticipantFileTest {
@@ -75,6 +76,8 @@ public class ParticipantFileTest {
 
         assertNotNull(keys);
         assertEquals(file.getMimeType(), keys.getMimeType());
+        assertTrue("Should be close to 24hrs difference between createdOn and expiresOn",
+                Math.abs(keys.getCreatedOn().plusDays(1).getMillis() - keys.getExpiresOn().getMillis()) < 1000);
         String uploadUrl = keys.getUploadUrl();
 
         URL url = new URL(uploadUrl);
@@ -124,6 +127,24 @@ public class ParticipantFileTest {
         resultList = results.getItems();
         assertEquals(1, resultList.size());
         assertNull(results.getNextPageOffsetKey());
+
+        // Updating an existing file
+        ParticipantFile updateKeys = userApi.createParticipantFile("file_id", file).execute().body();
+        url = new URL(updateKeys.getUploadUrl());
+        connection = (HttpURLConnection) url.openConnection();
+        connection.setDoOutput(true);
+        connection.setRequestMethod("PUT");
+        connection.setRequestProperty("Content-Type", "text/plain");
+        out = new OutputStreamWriter(connection.getOutputStream());
+        out.write("Updated text to S3.");
+        out.close();
+        assertEquals(200, connection.getResponseCode());
+        connection.disconnect();
+
+        ResponseBody updateBody = userApi.getParticipantFile("file_id").execute().body();
+        try (InputStream content = updateBody.byteStream(); Scanner sc = new Scanner(content)) {
+            assertEquals("Updated text to S3.", sc.nextLine());
+        }
 
         Message deleteMessage = userApi.deleteParticipantFile("file_id").execute().body();
         assertNotNull(deleteMessage);
