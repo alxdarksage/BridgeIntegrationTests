@@ -129,6 +129,7 @@ public class StudyTest {
         study.setDiseases(DISEASE_LIST);
         study.setStudyDesignTypes(DESIGN_TYPE_LIST);
         study.setSignInTypes(SIGN_IN_TYPES);
+        study.setKeywords("some keywords");
         
         // We had an issue where you could not store two contacts with the same
         // name; verify this restriction has been fixed.
@@ -166,6 +167,7 @@ public class StudyTest {
         assertEquals(DISEASE_LIST, study.getDiseases());
         assertEquals(DESIGN_TYPE_LIST, study.getStudyDesignTypes());
         assertEquals(SIGN_IN_TYPES, study.getSignInTypes());
+        assertEquals("some keywords", study.getKeywords());
         
         Contact retrievedContact1 = retrieved.getContacts().get(0);
         assertEquals(PRINCIPAL_INVESTIGATOR, retrievedContact1.getRole());
