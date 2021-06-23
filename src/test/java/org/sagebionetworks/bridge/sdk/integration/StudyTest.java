@@ -10,6 +10,8 @@ import static org.sagebionetworks.bridge.rest.model.ContactRole.PRINCIPAL_INVEST
 import static org.sagebionetworks.bridge.rest.model.ContactRole.TECHNICAL_SUPPORT;
 import static org.sagebionetworks.bridge.rest.model.IrbDecisionType.EXEMPT;
 import static org.sagebionetworks.bridge.rest.model.Role.STUDY_COORDINATOR;
+import static org.sagebionetworks.bridge.rest.model.SignInType.EMAIL_MESSAGE;
+import static org.sagebionetworks.bridge.rest.model.SignInType.PHONE_PASSWORD;
 import static org.sagebionetworks.bridge.rest.model.StudyPhase.DESIGN;
 import static org.sagebionetworks.bridge.rest.model.StudyPhase.IN_FLIGHT;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_1;
@@ -42,6 +44,7 @@ import org.sagebionetworks.bridge.rest.exceptions.UnauthorizedException;
 import org.sagebionetworks.bridge.rest.model.Contact;
 import org.sagebionetworks.bridge.rest.model.OrganizationList;
 import org.sagebionetworks.bridge.rest.model.Role;
+import org.sagebionetworks.bridge.rest.model.SignInType;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyList;
@@ -56,6 +59,9 @@ import com.google.common.collect.ImmutableMap;
 
 public class StudyTest {
     
+    private static final ImmutableList<SignInType> SIGN_IN_TYPES = ImmutableList.of(EMAIL_MESSAGE, PHONE_PASSWORD);
+    private static final ImmutableList<String> DESIGN_TYPE_LIST = ImmutableList.of("observational", "cross-over");
+    private static final ImmutableList<String> DISEASE_LIST = ImmutableList.of("kidney", "liver");
     private List<String> studyIdsToDelete = new ArrayList<>();
     private List<String> userIdsToDelete = new ArrayList<>();
     private TestUser testResearcher;
@@ -120,6 +126,11 @@ public class StudyTest {
         study.setIrbDecisionOn(LocalDate.parse("2012-12-12"));
         study.setIrbExpiresOn(LocalDate.parse("2013-12-12"));
         
+        study.setDiseases(DISEASE_LIST);
+        study.setStudyDesignTypes(DESIGN_TYPE_LIST);
+        study.setSignInTypes(SIGN_IN_TYPES);
+        study.setKeywords("some keywords");
+        
         // We had an issue where you could not store two contacts with the same
         // name; verify this restriction has been fixed.
         String contactEmail = IntegTestUtils.makeEmail(StudyTest.class);
@@ -152,6 +163,11 @@ public class StudyTest {
         assertEquals(EXEMPT, retrieved.getIrbDecisionType());
         assertEquals(LocalDate.parse("2012-12-12"), retrieved.getIrbDecisionOn());
         assertEquals(LocalDate.parse("2013-12-12"), retrieved.getIrbExpiresOn());
+        
+        assertEquals(DISEASE_LIST, study.getDiseases());
+        assertEquals(DESIGN_TYPE_LIST, study.getStudyDesignTypes());
+        assertEquals(SIGN_IN_TYPES, study.getSignInTypes());
+        assertEquals("some keywords", study.getKeywords());
         
         Contact retrievedContact1 = retrieved.getContacts().get(0);
         assertEquals(PRINCIPAL_INVESTIGATOR, retrievedContact1.getRole());
