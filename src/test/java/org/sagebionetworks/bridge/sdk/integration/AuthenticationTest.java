@@ -41,6 +41,7 @@ import com.fasterxml.jackson.databind.ObjectMapper;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+
 import retrofit2.Response;
 
 import java.io.IOException;
@@ -66,7 +67,7 @@ public class AuthenticationTest {
     private static TestUser phoneOnlyTestUser;
     private static AuthenticationApi authApi;
     private static ForSuperadminsApi superadminApi;
-    
+
     @BeforeClass
     public static void beforeClass() throws IOException {
         researchUser = TestUserHelper.createAndSignInUser(AuthenticationTest.class, true, RESEARCHER);
