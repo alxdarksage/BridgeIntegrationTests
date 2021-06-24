@@ -130,6 +130,14 @@ public class ParticipantFileTest {
 
         // Updating an existing file
         ParticipantFile updateKeys = userApi.createParticipantFile("file_id", file).execute().body();
+
+        try {
+            userApi.getParticipantFile("file_id").execute().body();
+            fail("Previous S3 file should have been deleted by new Create request.");
+        } catch (Exception exception) {
+            assertEquals("Not Found", exception.getMessage());
+        }
+
         url = new URL(updateKeys.getUploadUrl());
         connection = (HttpURLConnection) url.openConnection();
         connection.setDoOutput(true);
