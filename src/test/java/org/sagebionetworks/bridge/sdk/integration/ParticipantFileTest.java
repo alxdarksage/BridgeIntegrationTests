@@ -138,8 +138,6 @@ public class ParticipantFileTest {
         } catch (BridgeSDKException exception) {
             assertEquals("Not Found", exception.getMessage());
             assertEquals(404, exception.getStatusCode());
-        } catch (Exception e) {
-            fail("Unexpected Exception type.");
         }
 
         url = new URL(updateKeys.getUploadUrl());
