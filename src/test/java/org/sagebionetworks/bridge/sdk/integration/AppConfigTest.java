@@ -6,6 +6,7 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.sagebionetworks.bridge.rest.model.FileDisposition.INLINE;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_1;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.randomIdentifier;
 
@@ -193,6 +194,7 @@ public class AppConfigTest {
         
         FileMetadata meta = new FileMetadata();
         meta.setName("test file");
+        meta.setDisposition(INLINE);
         fileKeys = filesApi.createFile(meta).execute().body();
         
         File file = new File("src/test/resources/file-test/test.pdf");
