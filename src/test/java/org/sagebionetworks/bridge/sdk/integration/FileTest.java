@@ -4,6 +4,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
+import static org.sagebionetworks.bridge.rest.model.FileDisposition.INLINE;
 import static org.sagebionetworks.bridge.rest.model.FileRevisionStatus.AVAILABLE;
 import static org.sagebionetworks.bridge.rest.model.FileRevisionStatus.PENDING;
 import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
@@ -60,6 +61,7 @@ public class FileTest {
         metadata.setName("TestFile Name");
         metadata.setDescription("TestFile Description");
         metadata.setDeleted(true);
+        metadata.setDisposition(INLINE);
         
         ForDevelopersApi devsApi = developer.getClient(ForDevelopersApi.class);
         
@@ -135,6 +137,7 @@ public class FileTest {
             metadata.setName("TestFile Name");
             metadata.setDescription("TestFile Description");
             metadata.setDeleted(true);
+            metadata.setDisposition(INLINE);
             
             ForDevelopersApi devsApi = developer.getClient(ForDevelopersApi.class);
             

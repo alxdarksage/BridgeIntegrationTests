@@ -50,7 +50,6 @@ import org.sagebionetworks.bridge.rest.model.SignInType;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyList;
-import org.sagebionetworks.bridge.rest.model.StudyPhase;
 import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
@@ -99,14 +98,6 @@ public class StudyTest {
         }
     }
 
-    @Test
-    public void existingStudiesAreLegacy() throws Exception {
-        StudiesApi studiesApi = admin.getClient(StudiesApi.class);
-
-        Study study = studiesApi.getStudy(STUDY_ID_1).execute().body();
-        assertEquals(StudyPhase.LEGACY, study.getPhase());
-    }
-    
     @SuppressWarnings("unchecked")
     @Test
     public void test() throws IOException {
