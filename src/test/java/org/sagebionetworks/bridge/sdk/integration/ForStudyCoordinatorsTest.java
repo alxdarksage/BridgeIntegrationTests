@@ -40,6 +40,7 @@ import org.sagebionetworks.bridge.rest.model.EnrollmentDetail;
 import org.sagebionetworks.bridge.rest.model.EnrollmentDetailList;
 import org.sagebionetworks.bridge.rest.model.ExternalIdentifierList;
 import org.sagebionetworks.bridge.rest.model.IdentifierHolder;
+import org.sagebionetworks.bridge.rest.model.Message;
 import org.sagebionetworks.bridge.rest.model.NotificationMessage;
 import org.sagebionetworks.bridge.rest.model.NotificationRegistrationList;
 import org.sagebionetworks.bridge.rest.model.RequestInfo;
@@ -53,6 +54,8 @@ import org.sagebionetworks.bridge.rest.model.UploadList;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
+
+import retrofit2.Response;
 
 public class ForStudyCoordinatorsTest {
     
@@ -309,5 +312,15 @@ public class ForStudyCoordinatorsTest {
         enrollment = list.getItems().get(1);
         assertEquals(user.getUserId(), enrollment.getParticipant().getIdentifier());
         assertEquals(STUDY_ID_2, enrollment.getStudyId());
+    }
+    
+    @Test
+    public void installLinkWorks() throws Exception {
+        user = TestUserHelper.createAndSignInUser(ForStudyCoordinatorsTest.class, true);
+        
+        Response<Message> response = coordApi.sendStudyParticipantInstallLinkMessage(
+                STUDY_ID_1, user.getUserId()).execute();
+        assertEquals(202, response.code());
+        assertEquals("Install instructions sent to participant.", response.body().getMessage());
     }
 }
