@@ -333,7 +333,6 @@ public class AssessmentResourceTest {
         assertEquals(TITLE1, resource1.getTitle());
         assertEquals(URL1, resource1.getUrl());
         assertTrue(resource1.isUpToDate());
-        Long version = resource1.getVersion();
         
         String resourceGuid = resource1.getGuid();
         
@@ -342,7 +341,7 @@ public class AssessmentResourceTest {
         
         // Other study designer cannot see this local resource because the assessment is not accessible
         try {
-            PagedExternalResourceList resourcesPage = assessmentApiOrg2.getAssessmentResources(
+            assessmentApiOrg2.getAssessmentResources(
                     id, null, null, null, null, null, null).execute().body();
             fail("Should have thrown exception");
         } catch(EntityNotFoundException e) {

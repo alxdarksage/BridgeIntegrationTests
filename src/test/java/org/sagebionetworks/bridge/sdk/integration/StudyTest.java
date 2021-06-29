@@ -22,6 +22,7 @@ import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_2;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.SAGE_ID;
 import static org.sagebionetworks.bridge.util.IntegTestUtils.TEST_APP_ID;
 
+import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -35,6 +36,7 @@ import org.junit.Before;
 import org.junit.Test;
 
 import org.sagebionetworks.bridge.rest.RestUtils;
+import org.sagebionetworks.bridge.rest.api.FilesApi;
 import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
@@ -48,7 +50,6 @@ import org.sagebionetworks.bridge.rest.model.SignInType;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
 import org.sagebionetworks.bridge.rest.model.StudyList;
-import org.sagebionetworks.bridge.rest.model.StudyPhase;
 import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
@@ -97,14 +98,6 @@ public class StudyTest {
         }
     }
 
-    @Test
-    public void existingStudiesAreLegacy() throws Exception {
-        StudiesApi studiesApi = admin.getClient(StudiesApi.class);
-
-        Study study = studiesApi.getStudy(STUDY_ID_1).execute().body();
-        assertEquals(StudyPhase.LEGACY, study.getPhase());
-    }
-    
     @SuppressWarnings("unchecked")
     @Test
     public void test() throws IOException {
@@ -202,6 +195,17 @@ public class StudyTest {
         StudyList studyList = studiesApi.getStudies(null, null, false).execute().body();
         assertEquals(initialCount+1, studyList.getItems().size());
         assertFalse(studyList.getRequestParams().isIncludeDeleted());
+        
+        // upload a logo
+        File file = new File("src/test/resources/file-test/test.png");
+        String url = RestUtils.uploadStudyLogoToS3(studiesApi, id, file);
+
+        retrieved = studiesApi.getStudy(id).execute().body();
+        assertEquals(url, retrieved.getStudyLogoUrl());
+        
+        // Now use the admin to delete the logo it via the files API (cleanup)
+        String logoGuid = url.substring(url.lastIndexOf("/")+1, url.lastIndexOf("."));
+        admin.getClient(FilesApi.class).deleteFile(logoGuid, true).execute();
         
         // logically delete it
         studiesApi.deleteStudy(id, false).execute();
