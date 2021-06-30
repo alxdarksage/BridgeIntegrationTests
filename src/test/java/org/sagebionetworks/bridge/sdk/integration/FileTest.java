@@ -11,6 +11,8 @@ import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
 
 import java.io.File;
 
+import com.sun.net.httpserver.Headers;
+
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
@@ -27,6 +29,10 @@ import org.sagebionetworks.bridge.rest.model.FileRevisionList;
 import org.sagebionetworks.bridge.rest.model.GuidVersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
+
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
 
 public class FileTest {
     
@@ -156,6 +162,16 @@ public class FileTest {
             assertEquals("application/pdf", rev.getMimeType());
             assertTrue(rev.getSize() > 0L);
             assertEquals(rev.getStatus(), AVAILABLE);
+            
+            // Verify that this file is accessible on S3.
+            OkHttpClient client = new OkHttpClient();
+            Request request = new Request.Builder().url(rev.getDownloadURL()).build();
+            Response response = client.newCall(request).execute();
+            
+            assertEquals(200, response.code());
+            assertEquals("application/pdf", response.header("Content-Type"));
+            assertEquals("attachment; filename=\"test.pdf\"", response.header("Content-Disposition"));
+            assertEquals(rev.getSize(), Long.valueOf(response.header("Content-Length")));
             
             FileRevision oneRev = devsApi.getFileRevision(metadata.getGuid(), rev.getCreatedOn()).execute().body();
             assertEquals(url, oneRev.getDownloadURL());
