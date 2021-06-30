@@ -36,6 +36,7 @@ import retrofit2.Response;
 import org.sagebionetworks.bridge.rest.RestUtils;
 import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
+import org.sagebionetworks.bridge.rest.api.ForResearchersApi;
 import org.sagebionetworks.bridge.rest.api.ForSuperadminsApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
@@ -742,6 +743,16 @@ public class ParticipantsTest {
 
         info = usersApi.updateUsersIdentifiers(identifierUpdate).execute().body();
         assertEquals(IntegTestUtils.PHONE.getNumber(), info.getPhone().getNumber()); // unchanged
+    }
+    
+    @Test
+    public void installLinkWorks() throws Exception {
+        emailUser = TestUserHelper.createAndSignInUser(ParticipantsTest.class, true);
+        
+        Response<Message> response = researcher.getClient(ForResearchersApi.class)
+                .sendInstallLinkMessage(emailUser.getUserId()).execute();
+        assertEquals(202, response.code());
+        assertEquals("Install instructions sent to participant.", response.body().getMessage());
     }
 
     private static List<ScheduledActivity> findActivitiesByLabel(List<ScheduledActivity> scheduledActivityList,
