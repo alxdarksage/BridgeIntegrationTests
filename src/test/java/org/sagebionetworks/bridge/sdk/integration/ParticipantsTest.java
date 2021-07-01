@@ -319,6 +319,7 @@ public class ParticipantsTest {
         participant.setLanguages(languages);
         participant.setStatus(DISABLED); // should be ignored
         participant.setAttributes(attributes);
+        participant.setNote("test note 1");
         
         ParticipantsApi participantsApi = researcher.getClient(ParticipantsApi.class);
         IdentifierHolder idHolder = participantsApi.createParticipant(participant).execute().body();
@@ -361,7 +362,7 @@ public class ParticipantsTest {
             assertFalse(retrieved.isEmailVerified());
             assertFalse(retrieved.isPhoneVerified());
             createdOn = retrieved.getCreatedOn();
-            assertNull(retrieved.getNote());
+            assertEquals("test note 1", retrieved.getNote());
 
             // Can also get by the Synapse ID
             retrieved = participantsApi.getParticipantById(retrieved.getId(), true).execute().body();
