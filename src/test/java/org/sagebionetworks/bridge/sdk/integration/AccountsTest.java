@@ -124,7 +124,7 @@ public class AccountsTest {
         assertEquals("Test", RestUtils.toType(retrieved.getClientData(), String.class));
         assertEquals(ImmutableList.of("en", "fr"), retrieved.getLanguages());
         assertEquals(orgId, retrieved.getOrgMembership());
-        assertNull(retrieved.getNote());
+        assertEquals("test note 1", retrieved.getNote());
         assertNull(retrieved.getPassword());
         
         AccountSummarySearch search = new AccountSummarySearch().emailFilter(email);
