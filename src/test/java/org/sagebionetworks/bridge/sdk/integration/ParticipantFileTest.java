@@ -5,6 +5,7 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
+import org.sagebionetworks.bridge.rest.exceptions.BridgeSDKException;
 import org.sagebionetworks.bridge.rest.exceptions.InvalidEntityException;
 import org.sagebionetworks.bridge.rest.model.Message;
 import org.sagebionetworks.bridge.rest.model.ParticipantFile;
@@ -130,6 +131,15 @@ public class ParticipantFileTest {
 
         // Updating an existing file
         ParticipantFile updateKeys = userApi.createParticipantFile("file_id", file).execute().body();
+
+        try {
+            userApi.getParticipantFile("file_id").execute().body();
+            fail("Previous S3 file should have been deleted by new Create request.");
+        } catch (BridgeSDKException exception) {
+            assertEquals("Not Found", exception.getMessage());
+            assertEquals(404, exception.getStatusCode());
+        }
+
         url = new URL(updateKeys.getUploadUrl());
         connection = (HttpURLConnection) url.openConnection();
         connection.setDoOutput(true);
