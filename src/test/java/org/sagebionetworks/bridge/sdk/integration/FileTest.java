@@ -11,8 +11,6 @@ import static org.sagebionetworks.bridge.rest.model.Role.DEVELOPER;
 
 import java.io.File;
 
-import com.sun.net.httpserver.Headers;
-
 import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
