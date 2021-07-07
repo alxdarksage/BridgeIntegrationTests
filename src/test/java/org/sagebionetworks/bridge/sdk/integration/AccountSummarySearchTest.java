@@ -9,6 +9,11 @@ import static org.sagebionetworks.bridge.rest.model.EnrollmentFilter.WITHDRAWN;
 import static org.sagebionetworks.bridge.rest.model.Role.RESEARCHER;
 import static org.sagebionetworks.bridge.rest.model.Role.STUDY_COORDINATOR;
 import static org.sagebionetworks.bridge.rest.model.Role.WORKER;
+import static org.sagebionetworks.bridge.rest.model.SearchTermPredicate.OR;
+import static org.sagebionetworks.bridge.rest.model.StringSearchPosition.EXACT;
+import static org.sagebionetworks.bridge.rest.model.StringSearchPosition.INFIX;
+import static org.sagebionetworks.bridge.rest.model.StringSearchPosition.POSTFIX;
+import static org.sagebionetworks.bridge.rest.model.StringSearchPosition.PREFIX;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_1;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.ORG_ID_2;
 import static org.sagebionetworks.bridge.sdk.integration.Tests.STUDY_ID_1;
@@ -403,6 +408,35 @@ public class AccountSummarySearchTest {
         assertTrue(found.containsAll(ImmutableSet.of(s1, s1and2, s1not2)));
         assertFalse(found.containsAll(ImmutableSet.of(s2, s2not1)));
         
+        // Text search string position using email.
+        search = makeAccountSummarySearch().emailFilter(emailPrefix).stringSearchPosition(POSTFIX);
+        list = studyParticipantsApi.getStudyParticipants(STUDY_ID_1, search).execute().body();
+        found = mapUserIds(list);
+        assertFalse(found.containsAll(ImmutableSet.of(s1, s1and2, s1not2, s2not1)));
+
+        search = makeAccountSummarySearch().emailFilter(emailPrefix).stringSearchPosition(PREFIX);
+        list = studyParticipantsApi.getStudyParticipants(STUDY_ID_1, search).execute().body();
+        found = mapUserIds(list);
+        assertTrue(found.containsAll(ImmutableSet.of(s1, s1and2, s1not2, s2not1)));
+        assertFalse(found.containsAll(ImmutableSet.of(s2)));
+        
+        search = makeAccountSummarySearch().emailFilter("sagebase").stringSearchPosition(PREFIX);
+        list = studyParticipantsApi.getStudyParticipants(STUDY_ID_1, search).execute().body();
+        found = mapUserIds(list);
+        assertFalse(found.containsAll(ImmutableSet.of(s1, s1and2, s1not2, s2not1)));
+
+        search = makeAccountSummarySearch().emailFilter("sagebase").stringSearchPosition(INFIX);
+        list = studyParticipantsApi.getStudyParticipants(STUDY_ID_1, search).execute().body();
+        found = mapUserIds(list);
+        assertTrue(found.containsAll(ImmutableSet.of(s1, s1and2, s1not2, s2not1)));
+        
+        search = makeAccountSummarySearch().emailFilter(emailPrefix + "s1@sagebase.org")
+                .externalIdFilter("s1-s1not2").predicate(OR).stringSearchPosition(EXACT);
+        list = studyParticipantsApi.getStudyParticipants(STUDY_ID_1, search).execute().body();
+        found = mapUserIds(list);
+        assertEquals(list.getTotal(), Integer.valueOf(2));
+        assertTrue(found.containsAll(ImmutableSet.of(s1, s1not2)));
+
         // status matches. Admin has to toggle status.
         StudyParticipantsApi adminSPApi = admin.getClient(StudyParticipantsApi.class);
         StudyParticipant participant1 = adminSPApi.getStudyParticipantById(
