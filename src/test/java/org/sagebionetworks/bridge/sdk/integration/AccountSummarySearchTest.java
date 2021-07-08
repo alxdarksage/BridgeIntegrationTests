@@ -430,6 +430,7 @@ public class AccountSummarySearchTest {
         found = mapUserIds(list);
         assertTrue(found.containsAll(ImmutableSet.of(s1, s1and2, s1not2, s2not1)));
         
+        // Test predicate (and/or) by switching to OR search that should return two records
         search = makeAccountSummarySearch().emailFilter(emailPrefix + "s1@sagebase.org")
                 .externalIdFilter("s1-s1not2").predicate(OR).stringSearchPosition(EXACT);
         list = studyParticipantsApi.getStudyParticipants(STUDY_ID_1, search).execute().body();
