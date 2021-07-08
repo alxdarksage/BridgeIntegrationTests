@@ -474,19 +474,19 @@ public class AdherenceRecordsTest {
         assertEquals(ts1, sessionRecord.getStartedOn());
         assertEquals(ts4, sessionRecord.getFinishedOn());
 
-        // later changes do not update the session
+        // later changes DO not update the session
         updateAssessmentRecord(usersApi, asmt2.getInstanceGuid(), ts0, ts5);
 
         sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
-        assertEquals(ts1, sessionRecord.getStartedOn());
-        assertEquals(ts4, sessionRecord.getFinishedOn());
+        assertEquals(ts0, sessionRecord.getStartedOn());
+        assertEquals(ts5, sessionRecord.getFinishedOn());
         
         // declining one assessment doesn't decline the session
         declineAssessmentRecord(usersApi, asmt1.getInstanceGuid());
 
         sessionRecord = getSessionRecord(usersApi, schSession.getInstanceGuid());
         assertFalse(sessionRecord.isDeclined());
-        assertEquals(ts1, sessionRecord.getStartedOn());
+        assertEquals(ts0, sessionRecord.getStartedOn());
         assertNull(sessionRecord.getFinishedOn());
         
         // declining both assessments declines the session. Also wipes out the 
