@@ -5,6 +5,7 @@ import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.ContactRole.PRINCIPAL_INVESTIGATOR;
@@ -320,12 +321,8 @@ public class StudyTest {
     public void testPublicStudies() throws IOException {
         StudiesApi studiesApi = admin.getClient(StudiesApi.class);
         
-        StudyList list = studiesApi.getPublicStudyList(TEST_APP_ID, 0, 50).execute().body();
-        
-        Set<String> ids = list.getItems().stream().map(s -> s.getIdentifier()).collect(toSet());
-        assertTrue(ids.containsAll(ImmutableSet.of(STUDY_ID_1, STUDY_ID_2)));
-        
-        Study study = studiesApi.getStudy(STUDY_ID_1).execute().body();
-        assertEquals(study.getName(), "study1");
+        Study study = studiesApi.getPublicStudy(TEST_APP_ID, STUDY_ID_2).execute().body();
+        assertEquals("study2", study.getName());
+        assertNull(study.getVersion());
     }
 }
