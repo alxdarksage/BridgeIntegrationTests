@@ -38,6 +38,7 @@ import org.junit.Test;
 import org.sagebionetworks.bridge.rest.RestUtils;
 import org.sagebionetworks.bridge.rest.api.FilesApi;
 import org.sagebionetworks.bridge.rest.api.ForAdminsApi;
+import org.sagebionetworks.bridge.rest.api.ForConsentedUsersApi;
 import org.sagebionetworks.bridge.rest.api.OrganizationsApi;
 import org.sagebionetworks.bridge.rest.api.ParticipantsApi;
 import org.sagebionetworks.bridge.rest.api.StudiesApi;
@@ -320,5 +321,28 @@ public class StudyTest {
         
         StudyInfo study = studiesApi.getStudyInfo(TEST_APP_ID, STUDY_ID_2).execute().body();
         assertEquals("study2", study.getName());
+        
+        
+        TestUser user = TestUserHelper.createAndSignInUser(StudyTest.class, true);
+        userIdsToDelete.add(user.getUserId());
+        
+        // This person by default has been put into study 1.
+        
+        ForConsentedUsersApi usersApi = user.getClient(ForConsentedUsersApi.class);
+        Study usersStudy = usersApi.getStudy(STUDY_ID_1).execute().body();
+        assertEquals(STUDY_ID_1, usersStudy.getIdentifier());
+        
+        try {
+            usersApi.getStudy("study4").execute();
+            fail("Should have thrown exception");
+        } catch(EntityNotFoundException e) {
+            
+        }
+        try {
+            usersApi.getStudy(STUDY_ID_2).execute().body();
+            fail("Should have thrown exception");
+        } catch(UnauthorizedException e) {
+            
+        }
     }
 }
