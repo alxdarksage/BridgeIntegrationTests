@@ -57,6 +57,12 @@ import org.sagebionetworks.bridge.user.TestUserHelper;
 import org.sagebionetworks.bridge.user.TestUserHelper.TestUser;
 import org.sagebionetworks.bridge.util.IntegTestUtils;
 
+import okhttp3.OkHttpClient;
+import okhttp3.Request;
+import okhttp3.Response;
+import okhttp3.ResponseBody;
+
+import com.fasterxml.jackson.databind.ObjectMapper;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 
@@ -317,11 +323,24 @@ public class StudyTest {
     
     @Test
     public void testPublicStudies() throws IOException {
-        StudiesApi studiesApi = admin.getClient(StudiesApi.class);
+        String url = admin.getClientManager().getHostUrl() + "/v1/apps/api/studies/study1";
         
-        StudyInfo study = studiesApi.getStudyInfo(TEST_APP_ID, STUDY_ID_2).execute().body();
-        assertEquals("study2", study.getName());
+        OkHttpClient client = new OkHttpClient();
+        Request request = new Request.Builder().url(url).build();
+        Response response = client.newCall(request).execute();
         
+        assertEquals(200, response.code());
+        assertEquals("application/json;charset=UTF-8", response.header("Content-Type"));
+        
+        ResponseBody body = response.body();
+        String output = new String(body.bytes());
+        // enums need to be upper-cased for the vanilla ObjectMapper to deserialize properly
+        output = output.replace("design", "DESIGN");
+        output = output.replace("email_message", "EMAIL_MESSAGE");
+        output = output.replace("phone_message", "PHONE_MESSAGE");
+        
+        StudyInfo deser = new ObjectMapper().readValue(output, StudyInfo.class);
+        assertEquals(STUDY_ID_1, deser.getIdentifier());
         
         TestUser user = TestUserHelper.createAndSignInUser(StudyTest.class, true);
         userIdsToDelete.add(user.getUserId());
