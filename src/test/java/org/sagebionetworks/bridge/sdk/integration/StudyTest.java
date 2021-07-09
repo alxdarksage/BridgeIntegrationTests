@@ -1,5 +1,6 @@
 package org.sagebionetworks.bridge.sdk.integration;
 
+import static java.util.stream.Collectors.toSet;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
@@ -28,6 +29,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
@@ -57,6 +59,7 @@ import org.sagebionetworks.bridge.util.IntegTestUtils;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableSet;
 
 public class StudyTest {
     
@@ -312,4 +315,17 @@ public class StudyTest {
             
         adminStudiesApi.deleteStudy(tempStudyId, true).execute();
     }    
+    
+    @Test
+    public void testPublicStudies() throws IOException {
+        StudiesApi studiesApi = admin.getClient(StudiesApi.class);
+        
+        StudyList list = studiesApi.getPublicStudyList(TEST_APP_ID, 0, 50).execute().body();
+        
+        Set<String> ids = list.getItems().stream().map(s -> s.getIdentifier()).collect(toSet());
+        assertTrue(ids.containsAll(ImmutableSet.of(STUDY_ID_1, STUDY_ID_2)));
+        
+        Study study = studiesApi.getStudy(STUDY_ID_1).execute().body();
+        assertEquals(study.getName(), "study1");
+    }
 }
