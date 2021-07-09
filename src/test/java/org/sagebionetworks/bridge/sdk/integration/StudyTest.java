@@ -1,11 +1,9 @@
 package org.sagebionetworks.bridge.sdk.integration;
 
-import static java.util.stream.Collectors.toSet;
 import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertNotEquals;
 import static org.junit.Assert.assertNotNull;
-import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 import static org.sagebionetworks.bridge.rest.model.ContactRole.PRINCIPAL_INVESTIGATOR;
@@ -30,7 +28,6 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
 import org.joda.time.DateTime;
 import org.joda.time.LocalDate;
@@ -52,6 +49,7 @@ import org.sagebionetworks.bridge.rest.model.Role;
 import org.sagebionetworks.bridge.rest.model.SignInType;
 import org.sagebionetworks.bridge.rest.model.SignUp;
 import org.sagebionetworks.bridge.rest.model.Study;
+import org.sagebionetworks.bridge.rest.model.StudyInfo;
 import org.sagebionetworks.bridge.rest.model.StudyList;
 import org.sagebionetworks.bridge.rest.model.VersionHolder;
 import org.sagebionetworks.bridge.user.TestUserHelper;
@@ -60,7 +58,6 @@ import org.sagebionetworks.bridge.util.IntegTestUtils;
 
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.ImmutableSet;
 
 public class StudyTest {
     
@@ -321,8 +318,7 @@ public class StudyTest {
     public void testPublicStudies() throws IOException {
         StudiesApi studiesApi = admin.getClient(StudiesApi.class);
         
-        Study study = studiesApi.getPublicStudy(TEST_APP_ID, STUDY_ID_2).execute().body();
+        StudyInfo study = studiesApi.getStudyInfo(TEST_APP_ID, STUDY_ID_2).execute().body();
         assertEquals("study2", study.getName());
-        assertNull(study.getVersion());
     }
 }
