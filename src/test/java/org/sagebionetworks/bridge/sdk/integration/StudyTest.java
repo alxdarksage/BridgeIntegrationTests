@@ -336,6 +336,7 @@ public class StudyTest {
         String output = new String(body.bytes());
         // enums need to be upper-cased for the vanilla ObjectMapper to deserialize properly
         output = output.replace("design", "DESIGN");
+        output = output.replace("legacy", "LEGACY");
         output = output.replace("email_message", "EMAIL_MESSAGE");
         output = output.replace("phone_message", "PHONE_MESSAGE");
         
